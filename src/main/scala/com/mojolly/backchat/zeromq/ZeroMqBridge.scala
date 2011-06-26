@@ -10,6 +10,7 @@ import java.util.concurrent.TimeUnit
 import akka.dispatch.{ CompletableFuture }
 import net.liftweb.json.Serialization
 import com.weiglewilczek.slf4s.Logging
+import org.scala_tools.time.Imports._
 
 object ZeroMqBridge {
 
@@ -350,7 +351,7 @@ trait ServiceRegistryBridge { parent: ZeroMqBridge with ServerBridge ⇒
     }
   }
 }
-abstract class ZeroMqBridge(context: Context, deviceName: String) extends Actor with ZmqBridge with Supervised with Logging {
+abstract class ZeroMqBridge(context: Context, deviceName: String) extends Actor with ZmqBridge with Logging {
 
   ZeroMQ.bridgeDispatcher(self)
   self.id = ZeroMqBridge.actorId(deviceName)
@@ -388,7 +389,7 @@ abstract class ZeroMqBridge(context: Context, deviceName: String) extends Actor 
     logger info ("Starting %s" format self.id)
     logger trace ("pinned actor to dispatcher")
     val br = context.socket(Dealer)
-    br.setIdentity(self.uuid.toString.getBytes(Utf8))
+    br.setIdentity(self.uuid.toString.getBytes(ZMessage.defaultCharset))
     br.connect("inproc://" + deviceName + ".inproc")
     br.setLinger(0L)
     logger trace ("created socket")

@@ -18,6 +18,7 @@ resolvers ++= Seq(
 
 libraryDependencies ++= Seq(
   "net.liftweb" %% "lift-json" % "2.4-M1",
+  "net.liftweb" %% "lift-json-ext" % "2.4-M1",
   "org.scala-tools.time" %% "time" % "0.4",
   "se.scalablesolutions.akka" % "akka-stm" % "1.1.2",
   "com.weiglewilczek.slf4s" %% "slf4s" % "1.0.6",

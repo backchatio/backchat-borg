@@ -8,7 +8,7 @@ import annotation.tailrec
 object ZMessage {
 
   val DELIMITER = Array[Byte]()
-  var defaultCharset = Utf8
+  var defaultCharset = Charset.forName("UTF-8")
 
   def apply(socket: Socket) = {
     @tailrec

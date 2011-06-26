@@ -1,7 +1,6 @@
 package com.mojolly.backchat
 package zeromq
 
-import com.mojolly.backchat.actor.Supervised
 import akka.actor._
 import Messages._
 import collection.immutable.Queue
@@ -9,7 +8,7 @@ import com.weiglewilczek.slf4s.Logging
 
 case class ServiceListRequest(m: ProtocolMessage)
 case class ServiceList(services: List[String], m: ProtocolMessage)
-class ServiceRegistry(initialRegistry: Map[String, Queue[String]] = Map.empty, callback: Option[ActorRef] = None) extends Actor with Logging with Supervised {
+class ServiceRegistry(initialRegistry: Map[String, Queue[String]] = Map.empty, callback: Option[ActorRef] = None) extends Actor with Logging {
 
   protected var registry = initialRegistry
 

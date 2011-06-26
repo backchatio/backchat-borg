@@ -4,7 +4,7 @@ package zeromq
 import akka.actor._
 import Actor._
 import collection.immutable.Queue
-import org.joda.time.DateTime
+import org.scala_tools.time.Imports._
 
 case class AddToSentQueue(message: ProtocolMessage)
 case class ProcessedSuccessfully(message: ProtocolMessage)

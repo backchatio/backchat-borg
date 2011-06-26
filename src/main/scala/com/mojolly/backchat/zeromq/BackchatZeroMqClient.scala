@@ -1,11 +1,12 @@
 package com.mojolly.backchat
 package zeromq
 
-import queue.ApplicationEvent
 import akka.actor._
 import org.zeromq.ZMQ.Poller
 import Messages._
 import collection.immutable.SortedSet
+import org.scala_tools.time.Imports._
+import java.util.Locale.ENGLISH
 
 trait ZmqClient {
 
@@ -430,7 +431,7 @@ trait ClientBroker extends ZeroMQDevicePart with ClientZmqBroker { self: ZeroMQD
   abstract override def init() {
     trace("Starting ClientBroker %s", deviceName)
     super.init()
-    outbound.setIdentity(deviceName.getBytes(Utf8))
+    outbound.setIdentity(deviceName.getBytes(ZMessage.defaultCharset))
     outbound.connect(outboundAddress)
     trace("connected outbound to %s", outboundAddress)
     poller += (outbound -> (inboundHandler _))

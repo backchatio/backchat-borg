@@ -7,8 +7,8 @@ import java.util.concurrent.{ TimeUnit, Future, Executors }
 import org.zeromq.{ ZMQ ⇒ JZMQ }
 import org.zeromq.ZMQ.{ Poller }
 import akka.agent.Agent
-import akka.actor.{ Actor, ActorRef }
-import org.slf4j.LoggerFactory
+import akka.actor._
+import akka.config.Supervision._
 import com.weiglewilczek.slf4s.Logging
 
 object MessageType extends Enumeration {
@@ -107,7 +107,20 @@ trait PingPongObserver extends Actor { self: Actor ⇒
 
 object ZeroMQ extends Logging {
 
-  private[zeromq] val supervisor = Actor.actorOf(new Actor with Supervising).start()
+  private[zeromq] val supervisor = Actor.actorOf(new Actor {
+    self.faultHandler = OneForOneStrategy(List(classOf[Throwable]), 5, 5000)
+
+    protected def receive: Receive = { case _ ⇒ }
+
+    override def postStop() {
+      val i = self.linkedActors.values.iterator
+      while (i.hasNext) {
+        val ref = i.next
+        ref.stop()
+        self.unlink(ref)
+      }
+    }
+  }).start()
 
   private var _trace = false
 

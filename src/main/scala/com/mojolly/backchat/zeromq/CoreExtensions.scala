@@ -1,8 +1,15 @@
 package com.mojolly.backchat.zeromq
 
 import net.liftweb.json._
+import java.util.Locale.ENGLISH
 
 object CoreExtensions {
+
+  private val underscoreStepOne = "([A-Z]+)([A-Z][a-z])".r
+  private val underscoreStep2 = "([a-z\\d])([A-Z])".r
+  private val underscoreReplace = "$1_$2"
+
+
   class BackchatJValue(jvalue: JValue) {
     def toJson = asJson(jvalue)
     def toPrettyJson = asJson(jvalue, true)
@@ -20,6 +27,23 @@ object CoreExtensions {
         case x                                    ⇒ x
       }
     }
+  }
+
+  class BackchatString(s: String) {
+    def camelize = {
+      val lst = s.split("_").toList
+      (lst.head :: lst.tail.map(s ⇒ s.take(1).toUpperCase + s.substring(1))).mkString("")
+    }
+
+    def snakeize = {
+      underscoreStep2.replaceAllIn(
+        underscoreStepOne.replaceAllIn(
+          s, underscoreReplace), underscoreReplace).replace('-', '_').toLowerCase(ENGLISH)
+    }
+
+    def isBlank = s == null && s.trim.isEmpty
+    def isNotBlank = !isBlank
+    def toOption = if (isBlank) None else Some(s)
   }
 
 }

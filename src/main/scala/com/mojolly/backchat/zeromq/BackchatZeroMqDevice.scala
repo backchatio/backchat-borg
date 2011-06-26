@@ -3,6 +3,7 @@ package zeromq
 
 import akka.actor._
 import Messages._
+import java.util.Locale.ENGLISH
 
 case class DeviceConfig(context: Context, name: String, serverAddress: String, pollTimeout: Long = -1)
 
@@ -26,7 +27,7 @@ trait PubSubProxy extends ZeroMQDevicePart { self: ZeroMQDevice ⇒
 
   abstract override def init() {
     subscriber.connect(addressToProxy)
-    subscriber.subscribe("".getBytes(Utf8))
+    subscriber.subscribe("".getBytes(ZMessage.defaultCharset))
     pubsubProxy.bind(pubsubProxyAddress)
     poller += (subscriber -> (handleIncoming _))
     super.init()
@@ -229,10 +230,10 @@ trait ServerActorBridge extends ZeroMQDevicePart with ZeroMQBroker { self: ZeroM
   abstract override def init() {
     trace("Starting ServerActorBridge %s", deviceName)
     super.init()
-    router.setIdentity((deviceName + "-endpoint").getBytes(Utf8))
+    router.setIdentity((deviceName + "-endpoint").getBytes(ZMessage.defaultCharset))
     router.bind(routerAddress)
     trace("bound router to %s", routerAddress)
-    actorBridge.setIdentity(deviceName.getBytes(Utf8))
+    actorBridge.setIdentity(deviceName.getBytes(ZMessage.defaultCharset))
     actorBridge.bind(actorBridgeAddress)
     trace("bound bridge to %s", actorBridgeAddress)
     poller += (router -> (inboundHandler _))
