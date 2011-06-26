@@ -11,7 +11,7 @@ At this moment we have reliable client to server broker.
 xsbt 'test-only com.mojolly.backchat.zeromq.tests.ZeroMqSuite'  
 ```
 
-example xsbt script:
+example xsbt script:  
 ```bash
 #!/bin/sh
 java -Xms512m -Xmx1024m -XX:MaxPermSize=256m -XX:+CMSClassUnloadingEnabled  -Djava.library.path=/usr/local/lib -Dfile.encoding='UTF-8' -jar `dirname $0`/xsbt-launch.jar "$@"
