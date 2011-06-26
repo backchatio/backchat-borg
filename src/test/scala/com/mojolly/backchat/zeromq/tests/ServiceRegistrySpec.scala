@@ -7,7 +7,6 @@ import Actor._
 import akka.util.duration._
 import com.mojolly.backchat.zeromq.Messages._
 import collection.immutable.Queue
-import com.mojolly.backchat.queue.ApplicationEvent
 import net.liftweb.json._
 import org.zeromq.ZMQ
 import com.mojolly.backchat.zeromq._

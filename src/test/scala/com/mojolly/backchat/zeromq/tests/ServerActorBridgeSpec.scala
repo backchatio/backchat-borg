@@ -5,10 +5,8 @@ package tests
 import org.scalatest.matchers.MustMatchers
 import org.multiverse.api.latches.StandardLatch
 import org.zeromq.ZMQ
-import LibraryImports._
 import java.util.concurrent.{ CountDownLatch, TimeUnit }
 import akka.actor.{ Actor, Uuid }
-import queue.ApplicationEvent
 import collection.mutable.ListBuffer
 import org.scalatest.{ BeforeAndAfterAll, BeforeAndAfterEach, WordSpec }
 
@@ -22,7 +20,7 @@ class ServerActorBridgeSpec extends WordSpec with MustMatchers with BeforeAndAft
 
   def createBridgeSocket(id: String, name: String, context: Context) = {
     val br = context.socket(Dealer)
-    br.setIdentity(id.getBytes(Utf8))
+    br.setIdentity(id.getBytes(ZMessage.defaultCharset))
     br.connect("inproc://" + name + ".inproc")
     br.setLinger(0L)
     br
@@ -108,7 +106,7 @@ class ServerActorBridgeSpec extends WordSpec with MustMatchers with BeforeAndAft
         val routerAddress = config.serverAddress
       })
       val client = ServerActorBridgeSpec.context.socket(Req)
-      client.setIdentity(clientId.getBytes(Utf8))
+      client.setIdentity(clientId.getBytes(ZMessage.defaultCharset))
       client.connect("tcp://localhost:6260")
       client.setLinger(0)
       msg(client)
@@ -138,7 +136,7 @@ class ServerActorBridgeSpec extends WordSpec with MustMatchers with BeforeAndAft
       })
       latch.tryAwait(2, TimeUnit.SECONDS) must be(true)
       val client = config.context.socket(Req)
-      client.setIdentity(clientId.getBytes(Utf8))
+      client.setIdentity(clientId.getBytes(ZMessage.defaultCharset))
       client.connect("tcp://localhost:6262")
       client.setLinger(1)
       val bridge = createBridgeSocket(actorId, name, config.context)
@@ -165,7 +163,7 @@ class ServerActorBridgeSpec extends WordSpec with MustMatchers with BeforeAndAft
       })
       latch.tryAwait(2, TimeUnit.SECONDS) must be(true)
       val client = config.context.socket(Req)
-      client.setIdentity(clientId.getBytes(Utf8))
+      client.setIdentity(clientId.getBytes(ZMessage.defaultCharset))
       client.connect(config.serverAddress)
       val poller = new ZeroMQ.ZeroMQPoller(config.context)
       poller += (client -> ((msg: ZMessage) ⇒ {
@@ -193,7 +191,7 @@ class ServerActorBridgeSpec extends WordSpec with MustMatchers with BeforeAndAft
           case "IGNOREALL" ⇒
         }
         protected def onClientPing(cl: Array[Byte]) {
-          if (new String(cl, Utf8) == clientId) requestLatch.open()
+          if (new String(cl, ZMessage.defaultCharset) == clientId) requestLatch.open()
         }
       }).start()
       val dev = ZeroMQ startDevice (new BackchatZeroMqDevice(config) with ServerActorBridge with PingPongResponder {
@@ -202,7 +200,7 @@ class ServerActorBridgeSpec extends WordSpec with MustMatchers with BeforeAndAft
       })
       latch.tryAwait(2, TimeUnit.SECONDS) must be(true)
       val client = config.context.socket(Req)
-      client.setIdentity(clientId.getBytes(Utf8))
+      client.setIdentity(clientId.getBytes(ZMessage.defaultCharset))
       client.connect(config.serverAddress)
       ZMessage(clientId, "", "system", "", "", "PING")(client)
       requestLatch.tryAwait(2, TimeUnit.SECONDS) must be(true)

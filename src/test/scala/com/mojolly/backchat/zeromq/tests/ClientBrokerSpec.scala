@@ -7,7 +7,6 @@ import org.scalatest.matchers.MustMatchers
 import org.multiverse.api.latches.StandardLatch
 import java.util.concurrent.TimeUnit
 import org.zeromq.ZMQ
-import queue.ApplicationEvent
 import org.zeromq.ZMQ.Poller
 
 object ClientBrokerSpec {

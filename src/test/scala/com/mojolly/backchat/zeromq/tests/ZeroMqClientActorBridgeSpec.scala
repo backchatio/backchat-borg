@@ -5,14 +5,11 @@ package tests
 import org.scalatest.WordSpec
 import org.scalatest.matchers.MustMatchers
 import org.multiverse.api.latches.StandardLatch
-import queue.{ ApplicationEvent }
 import Messages._
 import akka.actor._
 import Actor._
 import akka.config.Supervision._
 import org.zeromq.ZMQ
-import LibraryImports._
-import actor._
 import java.util.concurrent.{ CountDownLatch, TimeUnit }
 
 object ZeroMqClientActorBridgeSpec {

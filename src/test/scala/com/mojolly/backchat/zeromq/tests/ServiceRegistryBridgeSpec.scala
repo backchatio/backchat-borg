@@ -9,7 +9,6 @@ import akka.util.duration._
 import collection.immutable.Queue
 import com.mojolly.backchat.zeromq._
 import org.zeromq.ZMQ
-import queue.ApplicationEvent
 import org.scalatest.{ BeforeAndAfterAll, WordSpec }
 import org.zeromq.ZMQ.Poller
 import akka.testkit._

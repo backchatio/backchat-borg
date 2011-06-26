@@ -8,11 +8,10 @@ import org.scalatest.{ BeforeAndAfterAll, GivenWhenThen, FeatureSpec }
 import org.zeromq.ZMQ
 import net.liftweb.json._
 import org.multiverse.api.latches.StandardLatch
-import queue.{ ApplicationEvent }
 import Messages._
 import java.util.concurrent.{ CountDownLatch, TimeUnit }
 import zeromq.ReliableClientBroker.{ AvailableServer, AvailableServers }
-import LibraryImports._
+import org.scala_tools.time.Imports._
 
 object ZeroMqIntegrationSpec {
   val context = ZMQ context 1

@@ -5,14 +5,13 @@ package tests
 import org.scalatest.matchers.MustMatchers
 import org.zeromq.ZMQ
 import org.multiverse.api.latches.StandardLatch
-import queue.ApplicationEvent
 import Messages._
 import zeromq.ReliableClientBroker._
-import LibraryImports._
 import java.util.concurrent.{ CountDownLatch, TimeUnit }
 import akka.actor._
 import Actor._
 import org.scalatest.{ BeforeAndAfterEach, BeforeAndAfterAll, WordSpec }
+import org.scala_tools.time.Imports._
 
 object ReliableClientBrokerSpec {
   val context = ZMQ context 1

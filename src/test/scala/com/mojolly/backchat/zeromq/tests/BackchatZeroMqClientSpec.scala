@@ -6,7 +6,6 @@ import org.scalatest.WordSpec
 import org.scalatest.matchers.MustMatchers
 import org.zeromq.ZMQ
 import org.multiverse.api.latches.StandardLatch
-import queue.ApplicationEvent
 import java.util.concurrent.TimeUnit
 import org.joda.time.Duration
 import akka.actor.Uuid

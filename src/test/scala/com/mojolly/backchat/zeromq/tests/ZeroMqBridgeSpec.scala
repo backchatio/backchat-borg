@@ -6,7 +6,6 @@ import org.scalatest.matchers.MustMatchers
 import org.zeromq.ZMQ
 import akka.actor._
 import org.multiverse.api.latches._
-import queue.ApplicationEvent
 import java.util.concurrent.TimeUnit
 import zeromq.Messages._
 import Actor._
