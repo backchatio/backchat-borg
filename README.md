@@ -3,6 +3,17 @@
 This is pretty much a work in progress.
 At this moment we have reliable client to server broker. 
 
+## How to run the tests?
+1. Build/install the jzmq library
+2. Add -Djava.library.path=/path/to/jzmq to your xsbt startup script  
+```bash
+#!/bin/sh
+java -Xms512m -Xmx1024m -XX:MaxPermSize=256m -XX:+CMSClassUnloadingEnabled  -Djava.library.path=/usr/local/lib -Dfile.encoding='UTF-8' -jar `dirname $0`/xsbt-launch.jar "$@"
+```
+3. run the test suite:  
+```
+xsbt 'test-only com.mojolly.backchat.zeromq.tests.ZeroMqSuite'  
+```
 ## How is it put together?
 
 This library starts with the idea that you want to create custom 0mq devices.  
