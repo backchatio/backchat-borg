@@ -41,7 +41,7 @@ object CoreExtensions {
           s, underscoreReplace), underscoreReplace).replace('-', '_').toLowerCase(ENGLISH)
     }
 
-    def isBlank = s == null && s.trim.isEmpty
+    def isBlank = s == null || s.trim.isEmpty
     def isNotBlank = !isBlank
     def toOption = if (isBlank) None else Some(s)
   }

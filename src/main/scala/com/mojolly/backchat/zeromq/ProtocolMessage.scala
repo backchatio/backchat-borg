@@ -12,7 +12,7 @@ object ProtocolMessage {
     new ProtocolMessage(
       if (zmsg.ccid.isBlank) new Uuid() else new Uuid(zmsg.ccid),
       zmsg.messageType,
-      if (zmsg.sender.isBlank) None else Some(zmsg.sender),
+      zmsg.sender.toOption,
       zmsg.target,
       zmsg.body)
   }
