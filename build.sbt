@@ -20,10 +20,10 @@ libraryDependencies ++= Seq(
   "net.liftweb" %% "lift-json" % "2.4-M4",
   "net.liftweb" %% "lift-json-ext" % "2.4-M4",
   "org.scala-tools.time" %% "time" % "0.5",
-  "se.scalablesolutions.akka" % "akka-stm" % "1.2-RC6",
-  "com.mojolly.logback" %% "logback-akka" % "0.7.2-SNAPSHOT",
+  "se.scalablesolutions.akka" % "akka-stm" % "1.2",
+  "com.mojolly.logback" %% "logback-akka" % "0.7.3-SNAPSHOT",
   "org.scalatest" %% "scalatest" % "1.6.1" % "test",
-  "se.scalablesolutions.akka" % "akka-testkit" % "1.2-RC6" % "test"
+  "se.scalablesolutions.akka" % "akka-testkit" % "1.2" % "test"
 )
 
 
