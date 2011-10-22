@@ -29,8 +29,6 @@ libraryDependencies ++= Seq(
 
 parallelExecution in Test := false
 
-credentials += Credentials(Path.userHome / ".ivy2" / ".credentials")
-
 publishTo <<= (version) { version: String =>
   val nexus = "http://maven.mojolly.com/content/repositories/"
   if (version.trim.endsWith("SNAPSHOT")) Some("snapshots" at nexus+"snapshots/")
