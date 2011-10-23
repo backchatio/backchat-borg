@@ -1,5 +1,4 @@
-package com.mojolly.backchat
-package zeromq
+package backchat.zeromq
 
 import net.liftweb.json.JsonParser
 import net.liftweb.json.JsonAST._

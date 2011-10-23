@@ -1,5 +1,4 @@
-package com.mojolly.backchat
-package zeromq
+package backchat.zeromq
 
 import akka.actor._
 import Messages._

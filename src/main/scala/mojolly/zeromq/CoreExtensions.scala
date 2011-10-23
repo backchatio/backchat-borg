@@ -1,4 +1,4 @@
-package com.mojolly.backchat.zeromq
+package backchat.zeromq
 
 import net.liftweb.json._
 import java.util.Locale.ENGLISH

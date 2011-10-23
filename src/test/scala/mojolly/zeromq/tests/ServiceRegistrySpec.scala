@@ -1,15 +1,16 @@
-package com.mojolly.backchat.zeromq.tests
+package backchat
+package zeromq
+package tests
 
 import akka.testkit._
 import org.scalatest.matchers.MustMatchers
 import akka.actor._
 import Actor._
 import akka.util.duration._
-import com.mojolly.backchat.zeromq.Messages._
+import Messages._
 import collection.immutable.Queue
 import net.liftweb.json._
 import org.zeromq.ZMQ
-import com.mojolly.backchat.zeromq._
 import org.scalatest.{ BeforeAndAfterAll, WordSpec }
 
 object ServiceRegistrySpec {

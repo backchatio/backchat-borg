@@ -8,14 +8,14 @@ At this moment we have reliable client to server broker.
 2. Add -Djava.library.path=/path/to/jzmq to your xsbt startup script  
 3. run the test suite:  
 ```
-xsbt 'test-only com.mojolly.backchat.zeromq.tests.ZeroMqSuite'  
+sbt test
 ```
 
 example xsbt script:  
 
 ```
 #!/bin/sh
-java -Xms512m -Xmx1024m -XX:MaxPermSize=256m -XX:+CMSClassUnloadingEnabled  -Djava.library.path=/usr/local/lib -Dfile.encoding='UTF-8' -jar `dirname $0`/xsbt-launch.jar "$@"
+java -Xms512m -Xmx1024m -XX:MaxPermSize=256m -XX:+CMSClassUnloadingEnabled  -Djava.library.path=/usr/local/lib:/usr/lib -Dfile.encoding='UTF-8' -jar `dirname $0`/sbt-launch.jar "$@"
 ```
 
 
@@ -54,7 +54,7 @@ ZeroMQ startDevice {
 val clientBridge = actorOf(new ZeroMqBridge(context, clientConfig.name) with ClientBridge).start()
 
 /* Getting a result from the server */
-clientBridge !! Request(serverActorName)
+(clientBridge ? Request(serverActorName)).as[ResponseObject]
 
 ```
 

@@ -1,5 +1,4 @@
-package com.mojolly.backchat
-package zeromq
+package backchat.zeromq
 
 import java.nio.charset.Charset
 import collection.mutable.ListBuffer

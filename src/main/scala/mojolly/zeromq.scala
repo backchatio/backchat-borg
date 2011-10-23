@@ -1,15 +1,16 @@
-package com.mojolly.backchat
+package backchat
 
 import org.zeromq.{ ZMQ ⇒ JZMQ }
 import akka.actor.Uuid
 import net.liftweb.json.JsonAST.JValue
 import java.util.Date
-import org.joda.time.format.ISODateTimeFormat
-import org.joda.time.{DateTimeZone, DateTime}
 import net.liftweb.json.{Formats, DateFormat, DefaultFormats}
 import net.liftweb.json.ext.JodaTimeSerializers
+import org.scala_tools.time.Imports._
+import org.joda.time.format.ISODateTimeFormat
 
-package zeromq {
+package object zeromq {
+
   class BackchatFormats extends DefaultFormats {
     override val dateFormat = new DateFormat {
 
@@ -21,11 +22,7 @@ package zeromq {
         case _ ⇒ None
       }
     }
-
   }
-}
-
-package object zeromq {
 
   type ZMQ = JZMQ
   type Socket = JZMQ.Socket
@@ -43,7 +40,7 @@ package object zeromq {
   val NoBlock = JZMQ.NOBLOCK
   private[zeromq] val MIN_DATE = new DateTime(0L)
   private[zeromq] val ISO8601_DATE = ISODateTimeFormat.dateTime.withZone(DateTimeZone.UTC)
-  private[zeromq] implicit val formats: Formats = new com.mojolly.backchat.zeromq.BackchatFormats ++ JodaTimeSerializers.all
+  private[zeromq] implicit val formats: Formats = new BackchatFormats ++ JodaTimeSerializers.all
 
   def newCcId = new Uuid().toString
 

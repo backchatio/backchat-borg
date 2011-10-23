@@ -1,10 +1,9 @@
-package com.mojolly.backchat
-package zeromq
+package backchat.zeromq
 
 import akka.actor._
 import akka.actor.Actor._
 import akka.config.Supervision._
-import zeromq.Messages._
+import Messages._
 import net.liftweb.json.JsonAST.JValue
 import java.util.concurrent.TimeUnit
 import akka.dispatch.{ CompletableFuture }

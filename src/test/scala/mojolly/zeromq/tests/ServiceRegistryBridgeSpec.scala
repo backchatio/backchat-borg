@@ -1,4 +1,4 @@
-package com.mojolly.backchat
+package backchat
 package zeromq
 package tests
 
@@ -7,7 +7,6 @@ import akka.actor._
 import Actor._
 import akka.util.duration._
 import collection.immutable.Queue
-import com.mojolly.backchat.zeromq._
 import org.zeromq.ZMQ
 import org.scalatest.{ BeforeAndAfterAll, WordSpec }
 import org.zeromq.ZMQ.Poller

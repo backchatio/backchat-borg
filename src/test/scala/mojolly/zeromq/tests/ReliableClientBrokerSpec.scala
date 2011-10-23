@@ -1,4 +1,4 @@
-package com.mojolly.backchat
+package backchat
 package zeromq
 package tests
 
