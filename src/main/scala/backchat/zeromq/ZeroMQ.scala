@@ -1,4 +1,6 @@
-package backchat.zeromq
+package backchat
+package zeromq
+
 
 import akka.dispatch.{ Dispatchers }
 import collection.mutable.ListBuffer

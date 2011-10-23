@@ -1,4 +1,6 @@
-package backchat.zeromq
+package backchat
+package zeromq
+
 
 import net.liftweb.json._
 import java.util.Locale.ENGLISH

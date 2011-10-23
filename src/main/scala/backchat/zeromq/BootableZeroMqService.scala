@@ -1,4 +1,6 @@
-package backchat.zeromq
+package backchat
+package zeromq
+
 
 import akka.util.Bootable
 

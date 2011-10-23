@@ -1,4 +1,6 @@
-package backchat.zeromq
+package backchat
+package zeromq
+
 
 import akka.actor._
 import org.zeromq.ZMQ.Poller

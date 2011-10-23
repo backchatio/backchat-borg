@@ -1,4 +1,6 @@
-package backchat.zeromq
+package backchat
+package zeromq
+
 
 import java.nio.charset.Charset
 import collection.mutable.ListBuffer
