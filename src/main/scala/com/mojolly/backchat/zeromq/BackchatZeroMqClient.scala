@@ -33,7 +33,7 @@ trait OnReady {
 }
 
 trait ClientZmqBroker extends ZmqBroker { self: ZeroMQDevice with ZmqBroker ⇒
-  protected val outbound: Socket
+  protected def outbound: Socket
   protected def sendToServer(zmsg: ZMessage)
 }
 
@@ -43,7 +43,7 @@ trait ClientPubSubSubscriber extends ZeroMQDevicePart with ClientZmqBroker { sel
     if (zmsg.messageType.toLowerCase(ENGLISH) == "pubsub") {
       zmsg.sender.toLowerCase(ENGLISH) match {
         case "subscribe" | "unsubscribe" ⇒ {
-          trace("[SOCKET] %sing to: %s", zmsg.sender.substring(0, zmsg.sender.length - 1), zmsg.target)
+          logger.trace("[SOCKET] %sing to: %s" format (zmsg.sender.substring(0, zmsg.sender.length - 1), zmsg.target))
           sendToServer(zmsg)
         }
         case _ ⇒ super.send(zmsg)
@@ -57,7 +57,7 @@ trait ClientPubSubPublisher extends PubSubPublisher { self: ZeroMQDevice with Cl
 
   abstract override def send(zmsg: ZMessage) {
     if (zmsg.messageType == "pubsub" && zmsg.sender == "publish") {
-      trace("publishing message: %s", zmsg)
+      logger.trace("publishing message: %s" format zmsg)
       zmsg(outbound)
     } else {
       super.send(zmsg)
@@ -71,21 +71,21 @@ trait ClientActorBridge extends ZeroMQDevicePart with OnReady { self: ZeroMQDevi
   //  protected var handler: Option[Uuid] = None
 
   abstract override def dispose() {
-    trace("Stopping ClientActorBridge %s", deviceName)
+    logger.trace("Stopping ClientActorBridge %s" format deviceName)
     actorBridge.close()
     super.dispose()
   }
 
   abstract override def init() {
-    trace("Starting ClientActorBridge %s", deviceName)
+    logger.trace("Starting ClientActorBridge %s" format deviceName)
     super.init()
     actorBridge.bind(actorBridgeAddress)
-    trace("bound bridge to %s", actorBridgeAddress)
+    logger.trace("bound bridge to %s" format actorBridgeAddress)
     poller += (actorBridge -> (send _))
   }
 
   protected def setHandler(h: String) {
-    trace("setting handler to %s", h)
+    logger.trace("setting handler to %s" format h)
     handler = Some(new Uuid(h))
     onReady(h)
   }
@@ -99,17 +99,17 @@ trait ClientActorBridge extends ZeroMQDevicePart with OnReady { self: ZeroMQDevi
   }
 
   protected def clearHandler(h: String) {
-    trace("clearing handler %s", h)
+    logger.trace("clearing handler %s" format h)
     val sndrId = new Uuid(h)
     if (handler.forall(_ == sndrId)) handler = None // only reset the handler if it's the same uuid
     onUnavailable(h)
   }
 
   abstract override def send(zmsg: ZMessage) {
-    trace("client actor bridge handling messag: %s", zmsg)
+    logger.trace("client actor bridge handling messag: %s" format zmsg)
     zmsg.messageType.toLowerCase(ENGLISH) match {
       case "system" if (List("READY", "STOPPING").contains(zmsg.body.toUpperCase(ENGLISH))) ⇒ {
-        trace("[%s] handling system message: %s", deviceName, zmsg)
+        logger.trace("[%s] handling system message: %s" format (deviceName, zmsg))
         zmsg.body.toUpperCase(ENGLISH) match {
           case "READY" ⇒ setHandler(zmsg.unwrap())
           case "STOPPING" ⇒ {
@@ -118,7 +118,7 @@ trait ClientActorBridge extends ZeroMQDevicePart with OnReady { self: ZeroMQDevi
         }
       }
       case _ ⇒ {
-        trace("[%s] forwarding message to next in chain", deviceName)
+        logger.trace("[%s] forwarding message to next in chain" format deviceName)
         super.send(zmsg)
       }
     }
@@ -156,7 +156,7 @@ object ReliableClientBroker {
       else left.nextPing < right.nextPing
     }
 
-    def pickServer = SortedSet(ss.toSeq: _*)(ordering) headOption
+    def pickServer = SortedSet(ss.toSeq: _*)(ordering).headOption
     def withoutExpired = new ActiveServers(ss.filter(_.expires >= DateTime.now))
     def thatNeedAPing = ss.filter(_.nextPing <= DateTime.now)
     val smallestPingTimeout =
@@ -185,20 +185,20 @@ trait ReliableClientBroker extends ZeroMQDevicePart with ClientZmqBroker with On
   protected def isConnected = activeServers.size > 0
 
   protected def slideTimeouts(endpoint: String) {
-    trace("sliding timeouts for: %s", endpoint)
+    logger.trace("sliding timeouts for: %s" format endpoint)
     availableServers.get(endpoint) foreach { serv ⇒
       activeServers.find(_.server == serv) foreach { as ⇒
         activeServers -= as
         val exp = new Duration(serv.ttl.millis * 3)
         val newer = ActiveServer(serv, endpoint, as.responseTime, DateTime.now + serv.ttl, DateTime.now + exp)
-        trace("adding newer to active servers: %s", newer)
+        logger.trace("adding newer to active servers: %s" format newer)
         activeServers += newer
       }
     }
   }
 
   protected def inboundHandler(zmsg: ZMessage) {
-    trace("Router [%s] got message: %s", deviceName, zmsg)
+    logger.trace("Router [%s] got message: %s" format (deviceName, zmsg))
     try {
       whenActive {
         zmsg match {
@@ -213,7 +213,7 @@ trait ReliableClientBroker extends ZeroMQDevicePart with ClientZmqBroker with On
               // yay we're connected. We've got a response let's reissue all the active requests.
               activeRequests.get(zmsg.ccid) foreach { _ ⇒ activeRequests -= zmsg.ccid }
               onConnected(serv.endpoint)
-              trace("active servers: %s", activeServers)
+              logger.trace("active servers: %s" format activeServers)
             }
           }
           case _ ⇒ {
@@ -245,7 +245,7 @@ trait ReliableClientBroker extends ZeroMQDevicePart with ClientZmqBroker with On
   }
 
   abstract override def dispose() {
-    trace("Stopping ReliableClientBroker %s", deviceName)
+    logger.trace("Stopping ReliableClientBroker %s" format deviceName)
     outbound.close()
     activeServers = new ActiveServers()
     activeRequests = Map[String, ActiveRequest]()
@@ -261,7 +261,7 @@ trait ReliableClientBroker extends ZeroMQDevicePart with ClientZmqBroker with On
     if (availableServers.isEmpty) sendToBridge(Error(new Uuid, "SERVER_UNAVAILABLE").toZMessage)
     availableServers foreach {
       case (endp, serv) ⇒ {
-        trace("trying to connect to: (%s, %s)", endp, serv)
+        logger.trace("trying to connect to: (%s, %s)" format (endp, serv))
         outbound.connect(serv.endpoint)
         if (!registeredInPoller) {
           poller += (outbound -> (inboundHandler _))
@@ -273,31 +273,31 @@ trait ReliableClientBroker extends ZeroMQDevicePart with ClientZmqBroker with On
   }
 
   protected def trackRequest(endp: String, msg: ZMessage) {
-    trace("tracking request for server '%s': %s", endp, msg)
+    logger.trace("tracking request for server '%s': %s" format (endp, msg))
     if (msg.messageType == "requestreply" || msg.body == "PING") {
       val ar = if (msg.body == "PING") ActiveRequest(msg, endp, DateTime.now, new DateTime(Long.MaxValue))
       else ActiveRequest(msg, endp, DateTime.now, requestTimeout.from(DateTime.now))
-      trace("registering active request: %s", ar)
+      logger.trace("registering active request: %s" format ar)
       activeRequests += msg.ccid -> ar
     }
     val toSend = msg.wrap(endp)
-    trace("sending: %s", toSend)
+    logger.trace("sending: %s" format toSend)
     toSend(outbound)
   }
 
   abstract override def send(zmsg: ZMessage) {
-    trace("[%s] handling message: %s", deviceName, zmsg)
+    logger.trace("[%s] handling message: %s" format (deviceName, zmsg))
     zmsg.messageType.toLowerCase(ENGLISH) match {
       case "requestreply" ⇒ {
-        trace("[%s] handling %s message in ReliableClientBroker: %s", deviceName, zmsg.messageType, zmsg)
+        logger.trace("[%s] handling %s message in ReliableClientBroker: %s" format (deviceName, zmsg.messageType, zmsg))
         sendToServer(zmsg)
       }
       case "fireforget" ⇒ {
-        trace("[%s] handling %s message: %s", deviceName, zmsg.messageType, zmsg)
+        logger.trace("[%s] handling %s message: %s" format (deviceName, zmsg.messageType, zmsg))
         sendToServer(zmsg)
       }
       case "system" if (List("READY", "STOPPING").contains(zmsg.body.toUpperCase(ENGLISH))) ⇒ {
-        trace("[%s] handling system message: %s", deviceName, zmsg)
+        logger.trace("[%s] handling system message: %s" format (deviceName, zmsg))
         zmsg.body.toUpperCase(ENGLISH) match {
           case "READY" ⇒ {
             zmsg.unwrap()
@@ -310,24 +310,24 @@ trait ReliableClientBroker extends ZeroMQDevicePart with ClientZmqBroker with On
         }
       }
       case _ ⇒ {
-        trace("[%s] forwarding message to next in chain", deviceName)
+        logger.trace("[%s] forwarding message to next in chain" format deviceName)
         super.send(zmsg)
       }
     }
   }
 
   protected def sendToServer(zmsg: ZMessage) {
-    trace("[%s] Entering send to server: %s\nservers: %s", deviceName, zmsg, activeServers)
+    logger.trace("[%s] Entering send to server: %s\nservers: %s" format (deviceName, zmsg, activeServers))
     activeServers.pickServer map { as ⇒
       trackRequest(as.endpoint, zmsg)
       as
     } getOrElse {
-      trace("sending unavailable from sendToServer")
+      logger.trace("sending unavailable from sendToServer")
       sendToBridge(Error(new Uuid(zmsg.ccid), "SERVER_UNAVAILABLE").toZMessage)
     }
   }
 
-  protected def sendPings {
+  protected def sendPings() {
     activeServers.thatNeedAPing.filterNot(as ⇒ activeRequests.exists(_._2.server == as.endpoint)) foreach { as ⇒
       trackRequest(as.endpoint, Ping.toZMessage)
     }
@@ -337,17 +337,17 @@ trait ReliableClientBroker extends ZeroMQDevicePart with ClientZmqBroker with On
     if (isActive) action
   }
 
-  protected def expireRequests {
+  protected def expireRequests() {
     if (isConnected) {
       val expired = activeRequests.filterNot(_._2.expires > DateTime.now)
-      trace("The expired requests: %s", expired)
+      logger.trace("The expired requests: %s" format expired)
       val fullyExpired = expired.filter(_._2.retries >= maxRetries)
-      trace("the fully expired requests: %s", fullyExpired)
+      logger.trace("the fully expired requests: %s" format fullyExpired)
       fullyExpired foreach { kv ⇒ sendToBridge(Error(new Uuid(kv._1), "TIMEOUT").toZMessage) }
       val toRetry = expired.filterNot(kv ⇒ fullyExpired.contains(kv._1)) map {
         case (k, v) ⇒ k -> v.copy(retries = v.retries + 1, expires = requestTimeout.from(DateTime.now))
       }
-      trace("the requests to retry: %s", toRetry)
+      logger.trace("the requests to retry: %s" format toRetry)
       activeRequests = activeRequests.filterNot(kv ⇒ expired.contains(kv._1)) ++ (toRetry map { r ⇒ r._1 -> retryRequest(r._2) })
     }
   }
@@ -358,12 +358,12 @@ trait ReliableClientBroker extends ZeroMQDevicePart with ClientZmqBroker with On
         ar.req.wrap(ar.server)(outbound)
         ccid -> ar.copy(retries = (ar.retries + 1), expires = requestTimeout.from(DateTime.now))
     }
-    trace("Retried the requests: %s", retried)
+    logger.trace("Retried the requests: %s" format retried)
     activeRequests ++= retried
   }
 
   protected def retryRequest(ar: ActiveRequest) = {
-    trace("retrying request: %s", ar)
+    logger.trace("retrying request: %s" format ar)
     new ActiveServers(activeServers.filterNot(_.endpoint == ar.server).toSeq: _*).pickServer map { server ⇒
       ar.req.wrap(server.endpoint)(outbound)
       ar.copy(server = server.endpoint)
@@ -373,23 +373,23 @@ trait ReliableClientBroker extends ZeroMQDevicePart with ClientZmqBroker with On
     }
   }
 
-  protected def expireServers {
+  protected def expireServers() {
     if (isConnected) {
-      trace("expiring servers")
+      logger.trace("expiring servers")
       val stillActive = activeServers.withoutExpired
-      trace("the active servers: %s", stillActive)
+      logger.trace("the active servers: %s" format stillActive)
       val expired = activeServers.filterNot(stillActive.contains)
-      trace("the expired servers: %s", expired)
+      logger.trace("the expired servers: %s" format expired)
       activeServers = stillActive
       val expiredRequests = activeRequests.filter(as ⇒ expired.exists(_.endpoint == as._2.server) && as._2.req.body != "PING")
-      trace("the expired requests: %s", expiredRequests)
+      logger.trace("the expired requests: %s" format expiredRequests)
       activeRequests = activeRequests.filterKeys(!expiredRequests.keySet.contains(_))
-      trace("The remaining active requests: %s", activeRequests)
+      logger.trace("The remaining active requests: %s" format activeRequests)
       if (!isConnected) {
-        trace("sending unavailable from expire servers")
+        logger.trace("sending unavailable from expire servers")
         sendToBridge(Error(new Uuid(), "SERVER_UNAVAILABLE").toZMessage)
       } else {
-        if (expiredRequests.keySet.size > 0) trace("sending unavailable to the active request dispatchers")
+        if (expiredRequests.keySet.size > 0) logger.trace("sending unavailable to the active request dispatchers")
         expiredRequests.keySet foreach { ccid ⇒ sendToBridge(Error(new Uuid(ccid), "SERVER_UNAVAILABLE").toZMessage) }
       }
     }
@@ -397,22 +397,22 @@ trait ReliableClientBroker extends ZeroMQDevicePart with ClientZmqBroker with On
 
   abstract override def execute() = {
     whenActive {
-      expireRequests
-      expireServers
+      expireRequests()
+      expireServers()
     }
-    sendPings
+    sendPings()
     poller.poll(activeServers.smallestPingTimeout)
     keepRunning
   }
 }
 
 trait ClientBroker extends ZeroMQDevicePart with ClientZmqBroker { self: ZeroMQDevice with ClientActorBridge ⇒
-  val outboundAddress: String
+  def outboundAddress: String
 
   protected val outbound = context.socket(Dealer)
 
   protected def inboundHandler(zmsg: ZMessage) {
-    trace("Router [%s] got message: %s", deviceName, zmsg)
+    logger.trace("Router [%s] got message: %s" format (deviceName, zmsg))
     if (handler.isDefined) {
       handler foreach { h ⇒
         Actor.registry.actorFor(h) foreach { _ ! ProtocolMessage(zmsg) }
@@ -423,31 +423,31 @@ trait ClientBroker extends ZeroMQDevicePart with ClientZmqBroker { self: ZeroMQD
   }
 
   abstract override def dispose() {
-    trace("Stopping ClientBroker %s", deviceName)
+    logger.trace("Stopping ClientBroker %s" format deviceName)
     outbound.close()
     super.dispose()
   }
 
   abstract override def init() {
-    trace("Starting ClientBroker %s", deviceName)
+    logger.trace("Starting ClientBroker %s" format deviceName)
     super.init()
     outbound.setIdentity(deviceName.getBytes(ZMessage.defaultCharset))
     outbound.connect(outboundAddress)
-    trace("connected outbound to %s", outboundAddress)
+    logger.trace("connected outbound to %s" format outboundAddress)
     poller += (outbound -> (inboundHandler _))
   }
 
   protected def sendToServer(zmsg: ZMessage) { zmsg(outbound) }
 
   abstract override def send(zmsg: ZMessage) {
-    trace("[%s] handling message: %s", deviceName, zmsg)
+    logger.trace("[%s] handling message: %s" format (deviceName, zmsg))
     zmsg.messageType.toLowerCase(ENGLISH) match {
       case "requestreply" | "fireforget" ⇒ {
-        trace("[%s] handling %s message: %s", deviceName, zmsg.messageType, zmsg)
+        logger.trace("[%s] handling %s message: %s" format (deviceName, zmsg.messageType, zmsg))
         sendToServer(zmsg)
       }
       case _ ⇒ {
-        trace("[%s] forwarding message to next in chain", deviceName)
+        logger.trace("[%s] forwarding message to next in chain" format deviceName)
         super.send(zmsg)
       }
     }

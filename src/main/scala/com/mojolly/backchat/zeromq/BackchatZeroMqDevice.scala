@@ -9,7 +9,7 @@ case class DeviceConfig(context: Context, name: String, serverAddress: String, p
 
 trait PubSubProxy extends ZeroMQDevicePart { self: ZeroMQDevice ⇒
 
-  val addressToProxy: String
+  def addressToProxy: String
   val pubsubProxyAddress = "inproc://" + deviceName + "-publisher.inproc"
 
   protected val subscriber = context.socket(Sub)
@@ -35,8 +35,8 @@ trait PubSubProxy extends ZeroMQDevicePart { self: ZeroMQDevice ⇒
 }
 
 trait Puller extends ZeroMQDevicePart { self: ZeroMQDevice ⇒
-  val pusherAddress: String
-  val callbackId: String
+  def pusherAddress: String
+  def callbackId: String
 
   protected val puller = context socket Pull
 
@@ -57,7 +57,7 @@ trait Puller extends ZeroMQDevicePart { self: ZeroMQDevice ⇒
 }
 
 trait LoadBalancedPusher extends ZeroMQDevicePart { self: ZeroMQDevice ⇒
-  val pusherAddress: String
+  def pusherAddress: String
   val pusherProxyAddress = "inproc://" + deviceName + ".inproc"
 
   protected val pusher = context socket Push
@@ -83,11 +83,11 @@ trait LoadBalancedPusher extends ZeroMQDevicePart { self: ZeroMQDevice ⇒
 
 trait PubSubSubscriber extends ZeroMQDevicePart with ZmqBroker { self: ZeroMQDevice with ZmqBroker ⇒
   abstract override protected def inboundHandler(zmsg: ZMessage) {
-    trace("Subscriber [%s] got message for handler '%s': %s", deviceName, handler, zmsg)
+    logger.trace("Subscriber [%s] got message for handler '%s': %s" format (deviceName, handler, zmsg))
     if (zmsg.messageType.toLowerCase(ENGLISH) == "pubsub" && zmsg.sender.toLowerCase(ENGLISH) == "publish") {
       handler foreach { h ⇒
         //        val msg = ZMessage("", newCcId, "pubsub", "", zmsg.target, zmsg.body)
-        trace("forwarding pubsub message %s", zmsg)
+        logger.trace("forwarding pubsub message %s" format zmsg)
         Actor.registry.actorFor(h) foreach { _ ! ProtocolMessage(zmsg) }
       }
     } else {
@@ -102,7 +102,7 @@ trait ServerPubSubSubscriber extends ZeroMQDevicePart with ZeroMQBroker { self: 
     if (zmsg.messageType.toLowerCase(ENGLISH) == "pubsub") {
       zmsg.sender.toLowerCase(ENGLISH) match {
         case "subscribe" | "unsubscribe" ⇒ {
-          trace("[SOCKET] %sing to: %s", zmsg.sender.substring(0, zmsg.sender.length - 1), zmsg.target)
+          logger.trace("[SOCKET] %sing to: %s" format (zmsg.sender.substring(0, zmsg.sender.length - 1), zmsg.target))
           zmsg(router)
         }
         case _ ⇒ super.send(zmsg)
@@ -116,7 +116,7 @@ trait ServerPubSubSubscriber extends ZeroMQDevicePart with ZeroMQBroker { self: 
 trait PubSubPublisher extends ZeroMQDevicePart with ZmqBroker { self: ZeroMQDevice with ZmqBroker ⇒
 
   abstract override protected def inboundHandler(zmsg: ZMessage) {
-    trace("Pubsub publisher got: %s", zmsg)
+    logger.trace("Pubsub publisher got: %s" format zmsg)
     zmsg.messageType.toLowerCase(ENGLISH) match {
       case "pubsub" ⇒ {
         val routes = Subscription(zmsg.addresses)
@@ -151,7 +151,7 @@ trait PubSubPublisher extends ZeroMQDevicePart with ZmqBroker { self: ZeroMQDevi
 trait ServerPubSubPublisher extends PubSubPublisher { self: ZeroMQDevice with ZeroMQBroker ⇒
   abstract override def send(zmsg: ZMessage) {
     if (zmsg.messageType == "pubsub" && zmsg.sender == "publish") {
-      trace("publishing message: %s", zmsg)
+      logger.trace("publishing message: %s" format zmsg)
       zmsg(router)
     } else {
       super.send(zmsg)
@@ -168,10 +168,10 @@ trait ZeroMQBroker extends ZmqBroker { self: ZeroMQDevice ⇒
 }
 
 case class ClientPing(clientId: Array[Byte])
-trait PingPongResponder extends ZeroMQBroker with Tracing { this: ZeroMQDevice with ZeroMQBroker ⇒
+trait PingPongResponder extends ZeroMQBroker { this: ZeroMQDevice with ZeroMQBroker ⇒
 
   abstract override protected def inboundHandler(zmsg: ZMessage) {
-    trace("inbound in pingpong responder got: %s", zmsg)
+    logger.trace("inbound in pingpong responder got: %s" format zmsg)
     if (zmsg.messageType == "system") {
       zmsg.body.toUpperCase(ENGLISH) match {
         case "PING" ⇒ {
@@ -207,13 +207,13 @@ trait ActorBridgeCreation extends ZeroMQDevicePart { self: ZeroMQDevice ⇒
 }
 
 trait ServerActorBridge extends ZeroMQDevicePart with ZeroMQBroker { self: ZeroMQDevice ⇒
-  val routerAddress: String
+  def routerAddress: String
   val actorBridgeAddress: String = "inproc://" + deviceName + ".inproc"
   protected val actorBridge = context.socket(Dealer)
   protected var activeRequests = Map[String, ZMessage]()
 
   protected def inboundHandler(zmsg: ZMessage) {
-    trace("Router [%s] got message: %s", deviceName, zmsg)
+    logger.trace("Router [%s] got message: %s" format (deviceName, zmsg))
     handler foreach { h ⇒
       if (zmsg.messageType.toLowerCase(ENGLISH) == "requestreply") activeRequests += zmsg.ccid -> zmsg
       Actor.registry.actorFor(h) foreach { _ ! ProtocolMessage(zmsg) }
@@ -221,56 +221,56 @@ trait ServerActorBridge extends ZeroMQDevicePart with ZeroMQBroker { self: ZeroM
   }
 
   abstract override def dispose() {
-    trace("Stopping ServerActorBridge %s", deviceName)
+    logger.trace("Stopping ServerActorBridge %s" format deviceName)
     actorBridge.close()
     router.close()
     super.dispose()
   }
 
   abstract override def init() {
-    trace("Starting ServerActorBridge %s", deviceName)
+    logger.trace("Starting ServerActorBridge %s" format deviceName)
     super.init()
     router.setIdentity((deviceName + "-endpoint").getBytes(ZMessage.defaultCharset))
     router.bind(routerAddress)
-    trace("bound router to %s", routerAddress)
+    logger.trace("bound router to %s" format routerAddress)
     actorBridge.setIdentity(deviceName.getBytes(ZMessage.defaultCharset))
     actorBridge.bind(actorBridgeAddress)
-    trace("bound bridge to %s", actorBridgeAddress)
+    logger.trace("bound bridge to %s" format actorBridgeAddress)
     poller += (router -> (inboundHandler _))
     poller += (actorBridge -> (send _))
   }
 
   protected def setHandler(h: String) {
-    trace("setting handler to %s", h)
+    logger.trace("setting handler to %s" format h)
     handler = Some(new Uuid(h))
   }
 
   protected def clearHandler(h: String) {
-    trace("clearing handler %s", h)
+    logger.trace("clearing handler %s" format h)
     val sndrId = new Uuid(h)
     if (handler.forall(_ == sndrId)) handler = None // only reset the handler if it's the same uuid
   }
 
   abstract override def send(zmsg: ZMessage) {
-    trace("[%s] handling message: %s", deviceName, zmsg)
+    logger.trace("[%s] handling message: %s" format (deviceName, zmsg))
     zmsg.messageType.toLowerCase(ENGLISH) match {
       case "system" if (List("READY", "STOPPING").contains(zmsg.body.toUpperCase(ENGLISH))) ⇒ {
-        trace("[%s] handling system message: %s", deviceName, zmsg)
+        logger.trace("[%s] handling system message: %s" format (deviceName, zmsg))
         zmsg.body.toUpperCase(ENGLISH) match {
           case "READY"    ⇒ setHandler(zmsg.unwrap())
           case "STOPPING" ⇒ clearHandler(zmsg.unwrap())
         }
       }
       case "requestreply" ⇒ {
-        trace("[%s] handling requestreply message: %s", deviceName, zmsg)
+        logger.trace("[%s] handling requestreply message: %s" format (deviceName, zmsg))
         //zmsg.unwrap()
         zmsg.addresses = activeRequests(zmsg.ccid).addresses
         activeRequests -= zmsg.ccid
-        trace("[%s] sending requestreply reply: %s", deviceName, zmsg)
+        logger.trace("[%s] sending requestreply reply: %s" format (deviceName, zmsg))
         zmsg(router)
       }
       case _ ⇒ {
-        trace("[%s] forwarding message to next in chain", deviceName)
+        logger.trace("[%s] forwarding message to next in chain" format deviceName)
         super.send(zmsg)
       }
     }

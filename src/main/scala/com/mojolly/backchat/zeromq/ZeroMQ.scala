@@ -19,7 +19,7 @@ object MessageType extends Enumeration {
   val PubSub = Value("ps")
 }
 
-trait ZeroMQDevicePart extends Tracing {
+trait ZeroMQDevicePart {
   def deviceName: String
 
   protected def context: Context
@@ -58,45 +58,13 @@ trait ZeroMQDevice extends ZeroMQDevicePart with Logging {
     keepRunning
   }
 
-  val id: Symbol
+  def id: Symbol
   def onError(th: Throwable) {}
 }
 
-trait Tracing extends Logging {
-  var tracing = ZeroMQ.trace
+trait PingPongObserver extends Actor { this: Actor ⇒
 
-  protected def trace(msg: ⇒ String) {
-    if (tracing) logger trace msg
-  }
-  protected def trace(msg: ⇒ String, p1: ⇒ Any) {
-    if (tracing) logger trace msg.format(p1)
-  }
-  protected def trace(msg: ⇒ String, p1: ⇒ Any, p2: ⇒ Any) {
-    if (tracing) logger trace msg.format(p1, p2)
-  }
-  protected def trace(msg: ⇒ String, p1: ⇒ Any, p2: ⇒ Any, p3: Any) {
-    if (tracing) logger trace msg.format(p1, p2, p3)
-  }
-  protected def trace(msg: ⇒ String, p1: ⇒ Any, p2: ⇒ Any, p3: ⇒ Any, p4: ⇒ Any) {
-    if (tracing) logger trace msg.format(p1, p2, p3, p4)
-  }
-  protected def trace(msg: ⇒ String, p1: ⇒ Any, p2: ⇒ Any, p3: ⇒ Any, p4: ⇒ Any, p5: ⇒ Any) {
-    if (tracing) logger trace msg.format(p1, p2, p3, p4, p5)
-  }
-  protected def trace(msg: ⇒ String, p1: ⇒ Any, p2: ⇒ Any, p3: ⇒ Any, p4: ⇒ Any, p5: ⇒ Any, p6: ⇒ Any) {
-    if (tracing) logger trace msg.format(p1, p2, p3, p4, p5, p6)
-  }
-  protected def trace(msg: ⇒ String, p1: ⇒ Any, p2: ⇒ Any, p3: ⇒ Any, p4: ⇒ Any, p5: ⇒ Any, p6: ⇒ Any, p7: ⇒ Any) {
-    if (tracing) logger trace msg.format(p1, p2, p3, p4, p5, p6, p7)
-  }
-  protected def trace(msg: ⇒ String, p1: ⇒ Any, p2: ⇒ Any, p3: ⇒ Any, p4: ⇒ Any, p5: ⇒ Any, p6: ⇒ Any, p7: ⇒ Any, p8: ⇒ Any) {
-    if (tracing) logger trace msg.format(p1, p2, p3, p4, p5, p6, p7, p8)
-  }
-}
-
-trait PingPongObserver extends Actor { self: Actor ⇒
-
-  become(observeClientPing orElse self.receive, false)
+  become(observeClientPing orElse receive, false)
 
   protected def observeClientPing: Receive = {
     case ClientPing(client) ⇒ onClientPing(client)
@@ -206,12 +174,12 @@ object ZeroMQ extends Logging {
   private val executor = Executors.newCachedThreadPool
 
   trait ZeroMQHostedDevice {
-    def start
-    def restart
-    def stop
+    def start()
+    def restart()
+    def stop()
   }
 
-  private def r(a: ⇒ Unit) = new Runnable { def run { a } }
+  private def r(a: ⇒ Unit) = new Runnable { def run() { a } }
 
   private class DeviceHost(device: ZeroMQDevice) extends ZeroMQHostedDevice with Logging {
 
@@ -233,7 +201,7 @@ object ZeroMQ extends Logging {
       }
     }
 
-    def start {
+    def start() {
       if (!isRunning) {
         future = executor.submit(r {
           try {
@@ -255,28 +223,28 @@ object ZeroMQ extends Logging {
       this
     }
 
-    def stop {
+    def stop() {
       if (isRunning) {
         future.cancel(true)
       }
       this
     }
 
-    def restart {
-      stop
-      start
+    def restart() {
+      stop()
+      start()
     }
   }
 
   def startDevice(zmqDevice: ZeroMQDevice): ZeroMQHostedDevice = {
     val deviceHost = new DeviceHost(zmqDevice)
-    deviceHost.start
+    deviceHost.start()
     activeDevices += deviceHost
     deviceHost
   }
 
   def stop() {
-    activeDevices foreach { _.stop }
+    activeDevices foreach { _.stop() }
     executor.shutdown()
     executor.awaitTermination(5, TimeUnit.SECONDS)
     //    context.term()
