@@ -138,8 +138,8 @@ class ZeroMqIntegrationSpec extends FeatureSpec with GivenWhenThen with BeforeAn
       val client = actorOf(new Actor {
         protected def receive = {
           case 'request ⇒ {
-            val repl = clientBridge !! Request(serverActorName, ApplicationEvent('a_client_request))
-            if (repl.map(_.asInstanceOf[ApplicationEvent]).forall(_.action == 'a_server_reply)) replyLatch.open()
+            val repl = (clientBridge ? Request(serverActorName, ApplicationEvent('a_client_request))).as[ApplicationEvent]
+            if (repl.forall(_.action == 'a_server_reply)) replyLatch.open()
           }
         }
       }).start()
@@ -369,8 +369,8 @@ class ZeroMqIntegrationSpec extends FeatureSpec with GivenWhenThen with BeforeAn
       val client = actorOf(new Actor {
         protected def receive = {
           case 'request ⇒ {
-            val repl = clientBridge !! Request(serverActorName, ApplicationEvent('a_client_request))
-            if (repl.map(_.asInstanceOf[ApplicationEvent]).forall(_.action == 'a_server_reply)) replyLatch.open()
+            val repl = (clientBridge ? Request(serverActorName, ApplicationEvent('a_client_request))).as[ApplicationEvent]
+            if (repl.forall(_.action == 'a_server_reply)) replyLatch.open()
           }
         }
       }).start()
@@ -396,7 +396,6 @@ class ZeroMqIntegrationSpec extends FeatureSpec with GivenWhenThen with BeforeAn
     //    }
 
     scenario("the actor subscribes to a topic") {
-      ZeroMQ.trace = true
       val serverConfig = DeviceConfig(context, "integr-rel-server-actor-subscribe-test", "inproc://integr-b-eee.inproc")
       val clientConfig = serverConfig.copy(name = "integr-rel-client-actor-subscribe-test")
       val serverLatch = new StandardLatch
@@ -480,7 +479,6 @@ class ZeroMqIntegrationSpec extends FeatureSpec with GivenWhenThen with BeforeAn
       serverBridge ! Publish("the-topic", ApplicationEvent('the_integr_publish))
       then("the client actor should receive the event")
       assert(eventLatch.tryAwait(2, TimeUnit.SECONDS))
-      ZeroMQ.trace = false
     }
   }
 

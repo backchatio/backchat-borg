@@ -37,7 +37,7 @@ class ServiceRegistryBridgeSpec extends WordSpec with MustMatchers with TestKit 
       val sut = actorOf(new ServiceRegistry(Map("message_channels" -> Queue(testActor.id)))).start()
       within(2.seconds) {
         bridge ! ProtocolMessage(ccid, "requestreply", Some("the-client"), "message_channels", "[\"the_request\"]")
-        expectMsg(appEvtMatch)
+        expectMsgPF()(appEvtMatch)
       }
       bridge.stop()
       sut.stop()
@@ -50,7 +50,7 @@ class ServiceRegistryBridgeSpec extends WordSpec with MustMatchers with TestKit 
       val sut = actorOf(new ServiceRegistry(Map("message_channels" -> Queue(testActor.id)))).start()
       within(2.seconds) {
         bridge ! ProtocolMessage(ccid, "fireforget", None, "message_channels", "[\"the_request\"]")
-        expectMsg(appEvtMatch)
+        expectMsgPF()(appEvtMatch)
       }
       bridge.stop()
       sut.stop()

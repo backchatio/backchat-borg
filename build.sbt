@@ -1,13 +1,20 @@
 
-name := "akka-zeromq"
+name := "backchat-borg"
 
 version := "0.0.2-SNAPSHOT"
 
-organization := "com.mojolly.zeromq"
+organization := "com.mojolly.borg"
 
 scalaVersion := "2.9.1"
 
 scalacOptions ++= Seq("-optimize", "-unchecked", "-deprecation", "-Xcheckinit", "-encoding", "utf8")
+
+ivyXML := <dependencies>
+      <exclude module="jms"/>
+      <exclude module="jmxtools"/>
+      <exclude module="jmxri"/>
+    </dependencies>
+
 
 resolvers ++= Seq(
   "GlassFish Repo" at "http://download.java.net/maven/glassfish/",
@@ -17,11 +24,14 @@ resolvers ++= Seq(
 )
 
 libraryDependencies ++= Seq(
+  "commons-codec" % "commons-codec" % "1.5",
   "net.liftweb" %% "lift-json" % "2.4-M4",
   "net.liftweb" %% "lift-json-ext" % "2.4-M4",
   "org.scala-tools.time" %% "time" % "0.5",
+  "org.apache.zookeeper" % "zookeeper" % "3.3.0",
   "se.scalablesolutions.akka" % "akka-stm" % "1.2",
   "com.mojolly.logback" %% "logback-akka" % "0.7.3-SNAPSHOT",
+  "org.scala-tools.testing" %% "specs" % "1.6.9" % "test",
   "org.scalatest" %% "scalatest" % "1.6.1" % "test",
   "se.scalablesolutions.akka" % "akka-testkit" % "1.2" % "test"
 )

@@ -117,35 +117,35 @@ class ClientBrokerSpec extends WordSpec with MustMatchers {
       dev.stop
     }
 
-    //    "publish a message to a subscriber" in {
-    //      val config = DeviceConfig(context, "client-broker-publish", "inproc://server-router-publish.inproc")
-    //      val brokerLatch = new StandardLatch
-    //      val server = createServer(config.serverAddress)
-    //      val dev = ZeroMQ startDevice {
-    //        new BackchatZeroMqDevice(config) with ClientActorBridge with ClientBroker with PubSubPublisher {
-    //          val outboundAddress = config.serverAddress
-    //          override def init() {
-    //            super.init()
-    //            brokerLatch.open()
-    //          }
-    //        }
-    //      }
-    //      brokerLatch.tryAwait(3, TimeUnit.SECONDS) must be (true)
-    //      val subscriber = context.socket(Sub)
-    //      subscriber.connect(config.pubsubAddress)
-    //      subscriber.subscribe("the-topic".getBytes("UTF-8"))
-    //      val poller = new ZeroMQ.ZeroMQPoller(context)
-    //      val subscriberLatch = new StandardLatch
-    //      poller += (subscriber -> ((msg: ZMessage) => {
-    //        println("the message: " + msg)
-    //        if(msg.address == "the-topic" && msg.body == ApplicationEvent('ping).toJson)
-    //          subscriberLatch.open()
-    //      }))
-    //      poller.init()
-    //      val client = createClient(config.name)
-    //      ZMessage("", newCcId, "pubsub", "publish", "the-topic", ApplicationEvent('ping).toJson)(client)
-    //      poller.poll(2000)
-    //      subscriberLatch.tryAwait(10, TimeUnit.MILLISECONDS) must be (true)
-    //    }
+//    "publish a message to a subscriber" in {
+//      val config = DeviceConfig(context, "client-broker-publish", "inproc://server-router-publish.inproc")
+//      val brokerLatch = new StandardLatch
+//      val server = createServer(config.serverAddress)
+//      val dev = ZeroMQ startDevice {
+//        new BackchatZeroMqDevice(config) with ClientActorBridge with ClientBroker with PubSubPublisher {
+//          val outboundAddress = config.serverAddress
+//          override def init() {
+//            super.init()
+//            brokerLatch.open()
+//          }
+//        }
+//      }
+//      brokerLatch.tryAwait(3, TimeUnit.SECONDS) must be (true)
+//      val subscriber = context.socket(Sub)
+//      subscriber.connect(config.pubsubAddress)
+//      subscriber.subscribe("the-topic".getBytes("UTF-8"))
+//      val poller = new ZeroMQ.ZeroMQPoller(context)
+//      val subscriberLatch = new StandardLatch
+//      poller += (subscriber -> ((msg: ZMessage) => {
+//        println("the message: " + msg)
+//        if(msg.address == "the-topic" && msg.body == ApplicationEvent('ping).toJson)
+//          subscriberLatch.open()
+//      }))
+//      poller.init()
+//      val client = createClient(config.name)
+//      ZMessage("", newCcId, "pubsub", "publish", "the-topic", ApplicationEvent('ping).toJson)(client)
+//      poller.poll(2000)
+//      subscriberLatch.tryAwait(10, TimeUnit.MILLISECONDS) must be (true)
+//    }
   }
 }

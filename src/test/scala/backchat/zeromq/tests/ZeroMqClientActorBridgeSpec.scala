@@ -93,8 +93,8 @@ class ZeroMqClientActorBridgeSpec extends WordSpec with MustMatchers {
         self.id = name + "-actor"
         protected def receive = {
           case 'request ⇒ {
-            val repl = bridge !! Request("the-target", ApplicationEvent('pingping))
-            if (repl.map(_.asInstanceOf[ApplicationEvent]).forall(_.action == 'pongpong)) replyLatch.open()
+            val repl = (bridge ? Request("the-target", ApplicationEvent('pingping))).as[ApplicationEvent]
+            if (repl.forall(_.action == 'pongpong)) replyLatch.open()
           }
         }
       }).start()
@@ -170,9 +170,7 @@ class ZeroMqClientActorBridgeSpec extends WordSpec with MustMatchers {
         self.id = name + "-actor"
         protected def receive = {
           case 'request ⇒ {
-            try {
-              bridge !! Request("the-target", ApplicationEvent('pingping))
-            } catch {
+            (bridge ? Request("the-target", ApplicationEvent('pingping))) onException {
               case e: ServerUnavailableException ⇒ replyLatch.open()
             }
           }
@@ -208,10 +206,9 @@ class ZeroMqClientActorBridgeSpec extends WordSpec with MustMatchers {
         self.id = name + "-actor"
         protected def receive = {
           case 'request ⇒ {
-            try {
-              bridge !! Request("the-target", ApplicationEvent('pingping))
-            } catch {
+            (bridge ? Request("the-target", ApplicationEvent('pingping))) onException {
               case e: RequestTimeoutException ⇒ replyLatch.open()
+              case _ =>
             }
           }
         }

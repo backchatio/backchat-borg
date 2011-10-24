@@ -291,19 +291,18 @@ class ReliableClientBrokerSpec extends WordSpec with MustMatchers with BeforeAnd
         }
       }
       brokerLatch.tryAwait(2, TimeUnit.SECONDS) must be(true)
-      val clientBridge = actorOf(new ZeroMqBridge(context, name) with ClientBridge {
-        self.timeout = 15.seconds.millis
-      }).start()
+
+      val clientBridge = actorOf(new ZeroMqBridge(context, name) with ClientBridge {}).start()
       val counter = new CountDownLatch(2)
       val client = actorOf(new Actor {
-        self.timeout = 15.seconds.millis
+        implicit val timeout = Actor.Timeout(15.seconds.millis)
         protected def receive = {
           case 'first ⇒ {
-            val res = clientBridge !! Request(config.name, ApplicationEvent('the_request1), reqid1, config.name + "-client")
+            val res = (clientBridge ? Request(config.name, ApplicationEvent('the_request1), reqid1, config.name + "-client")).await.result
             if (res.isDefined) counter.countDown()
           }
           case 'second ⇒ {
-            val res = clientBridge !! Request(config.name, ApplicationEvent('the_request2), reqid2, config.name + "-client")
+            val res = (clientBridge ? Request(config.name, ApplicationEvent('the_request2), reqid2, config.name + "-client")).await.result
             if (res.isDefined) counter.countDown()
           }
         }
@@ -427,7 +426,6 @@ class ReliableClientBrokerSpec extends WordSpec with MustMatchers with BeforeAnd
 
   "the server is disconnected" should {
     "reply to client with server unavailable when there are no servers available" in {
-      ZeroMQ.trace = true
       val name = "rel-cl-broker-no-server"
       val config = DeviceConfig(context, name, "inproc://" + name + "-router.inproc")
       val brokerLatch = new StandardLatch
@@ -468,12 +466,8 @@ class ReliableClientBrokerSpec extends WordSpec with MustMatchers with BeforeAnd
       server.close()
       client.stop()
       dev.stop
-      ZeroMQ.trace = false
     }
 
   }
 
-  override protected def afterEach() {
-    ZeroMQ.trace = false
-  }
 }

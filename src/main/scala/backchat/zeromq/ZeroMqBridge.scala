@@ -58,10 +58,10 @@ object ZeroMqBridge {
     }
   }
 
-  private[zeromq] class ReplyClient(ccid: String, reqFuture: CompletableFuture[Any], recvTimeout: Long) extends Actor with Logging {
+  private[zeromq] class ReplyClient(ccid: String, reqFuture: CompletableFuture[Any])(implicit recvTimeout: Actor.Timeout) extends Actor with Logging {
     self.id = "reply-" + ccid
     self.lifeCycle = Temporary
-    self.timeout = recvTimeout
+
     protected def receive = {
       case m: ApplicationEvent ⇒ {
         reqFuture.completeWithResult(m)
@@ -276,6 +276,7 @@ trait ZmqBridge { parent: ZeroMqBridge ⇒
 class RequestRequiresFutureException extends Exception("To make a request we require a future '!!' or '!!!'.")
 trait ClientBridge { parent: ZeroMqBridge ⇒
 
+
   protected def bridgeMessage: Receive = {
     case m@ProtocolMessage(_, "requestreply", None, target, payload) ⇒ { // when sender is missing it's a reply
       logger trace ("received a reply: %s" format m)
@@ -292,7 +293,8 @@ trait ClientBridge { parent: ZeroMqBridge ⇒
     }
     case m: Request ⇒ {
       if (!self.senderFuture().isDefined) throw new RequestRequiresFutureException
-      val requester = actorOf(new ZeroMqBridge.ReplyClient(m.ccid.toString, self.senderFuture().get, self.timeout)).start()
+      implicit val timeout = Actor.Timeout(akka.util.Duration(self.senderFuture().get.timeoutInNanos, TimeUnit.NANOSECONDS))
+      val requester = actorOf(new ZeroMqBridge.ReplyClient(m.ccid.toString, self.senderFuture().get)).start()
       sendToBridge(m.copy(sender = requester.id).toZMessage)
     }
     case m: Enqueue ⇒ sendToBridge(m.toZMessage)

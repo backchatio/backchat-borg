@@ -92,7 +92,7 @@ class ServiceRegistrySpec extends WordSpec with MustMatchers with TestKit with B
         val sut = actorOf(new ServiceRegistry(Map("message_channels" -> Queue(testActor.id)), Some(testActor))).start()
         within(2.seconds) {
           sut ! Request("message_channels", ApplicationEvent('the_request), ccid)
-          expectMsg(appEvtMatch)
+          expectMsgPF()(appEvtMatch)
           expectMsg('forwarded -> Queue(testActor.id))
         }
         sut.stop()
@@ -110,7 +110,7 @@ class ServiceRegistrySpec extends WordSpec with MustMatchers with TestKit with B
         val sut = actorOf(new ServiceRegistry(Map("message_channels" -> Queue(testActor.id, "another-actor")), Some(testActor))).start()
         within(2.seconds) {
           sut ! Request("message_channels", ApplicationEvent('the_request), ccid)
-          expectMsg(appEvtMatch)
+          expectMsgPF()(appEvtMatch)
           expectMsg('forwarded -> Queue("another-actor", testActor.id))
         }
         sut.stop()
@@ -122,7 +122,7 @@ class ServiceRegistrySpec extends WordSpec with MustMatchers with TestKit with B
         val sut = actorOf(new ServiceRegistry(Map("message_channels" -> Queue(testActor.id)), Some(testActor))).start()
         within(2.seconds) {
           sut ! Enqueue("message_channels", ApplicationEvent('the_request), ccid)
-          expectMsg(appEvtMatch)
+          expectMsgPF()(appEvtMatch)
           expectMsg('forwarded -> Queue(testActor.id))
         }
         sut.stop()
@@ -131,7 +131,7 @@ class ServiceRegistrySpec extends WordSpec with MustMatchers with TestKit with B
         val sut = actorOf(new ServiceRegistry(Map("message_channels" -> Queue(testActor.id, "another-actor")), Some(testActor))).start()
         within(2.seconds) {
           sut ! Enqueue("message_channels", ApplicationEvent('the_request), ccid)
-          expectMsg(appEvtMatch)
+          expectMsgPF()(appEvtMatch)
           expectMsg('forwarded -> Queue("another-actor", testActor.id))
         }
         sut.stop()

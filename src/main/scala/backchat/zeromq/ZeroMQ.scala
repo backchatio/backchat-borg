@@ -91,18 +91,6 @@ object ZeroMQ extends Logging {
     }
   }).start()
 
-  private var _trace = false
-
-  def trace = _trace
-  def trace_=(v: Boolean) {
-    //    if(v) {
-    //      LoggerHandler.config.send(LoggingConfig(LogLevel.Trace, false))
-    //    } else {
-    //      LoggerHandler.config.send(LoggingConfig(LogLevel.Debug, false))
-    //    }
-    _trace = v
-  }
-
   private var activeDevices = Set[ZeroMQHostedDevice]()
   //  private val BridgeDispatcher = Dispatchers.newHawtDispatcher(false)
 

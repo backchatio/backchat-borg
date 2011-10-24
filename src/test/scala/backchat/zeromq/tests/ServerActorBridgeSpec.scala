@@ -16,7 +16,6 @@ object ServerActorBridgeSpec {
 class ServerActorBridgeSpec extends WordSpec with MustMatchers with BeforeAndAfterAll {
 
   //  val config = DeviceConfig(SimpleBrokerSpec.context, "simple-broker-example", "tcp://*:6256", "tcp://*:6257")
-  //  ZeroMQ.trace = true
 
   def createBridgeSocket(id: String, name: String, context: Context) = {
     val br = context.socket(Dealer)
