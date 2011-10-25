@@ -1,8 +1,12 @@
+# -*- encoding: utf-8 -*-
+
 require 'active_support'
 require 'zmq'
 require 'uuidtools'
 require 'logger'
 require 'backchat_borg/zmessage'
+
+require 'backchat_borg/client'
 
 module Backchat
   module Borg
@@ -13,6 +17,10 @@ module Backchat
 
     def self.logger 
       @@logger
+    end
+
+    def self.context
+      @@context ||= ZMQ::Context.new(1)
     end
     
   end
