@@ -1,3 +1,4 @@
+
 package backchat
 package borg
 
@@ -453,6 +454,7 @@ trait ClientBroker extends ZeroMQDevicePart with ClientZmqBroker { self: ZeroMQD
     }
   }
 }
+
 class BackchatZeroMqClient(val id: String, context: Context, deviceName: String, receiveTimeout: Duration = 15.seconds) extends ZeroMqClient {
 
   protected val client: Socket = context socket Dealer

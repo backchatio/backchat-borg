@@ -28,5 +28,6 @@ object ApplicationEvent {
   }
 }
 case class ApplicationEvent(action: Symbol, data: JValue) extends EventMessage {
-  def toJson: String = JArray(JString(action.name) :: data :: Nil).toJson
+  def toJson: String = toJValue.toJson
+  def toJValue: JValue = JArray(JString(action.name) :: data :: Nil)
 }

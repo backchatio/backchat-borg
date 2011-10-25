@@ -7,6 +7,7 @@ import Actor._
 import org.zeromq.ZMQ
 import org.multiverse.api.latches.StandardLatch
 import java.util.concurrent.TimeUnit
+import net.liftweb.json._
 
 object ReliableActorServer {
   val context = ZMQ.context(1)
@@ -15,7 +16,7 @@ object ReliableActorServer {
 
 
     val connectionLatch = new StandardLatch()
-    val serverConfig = DeviceConfig("reliable-actor-server", "tcp://127.0.0.1:13242", context = context)
+    val serverConfig = DeviceConfig(context, "reliable-actor-server", "tcp://127.0.0.1:13242")
 
     ZeroMQ startDevice (
       new BackchatZeroMqDevice(serverConfig) with ServerActorBridge {
@@ -32,7 +33,13 @@ object ReliableActorServer {
       actorOf(new Actor {
         self.id = "the-target"
         protected def receive = {
-          case m => println("RECV: " + m)
+          case ApplicationEvent('pong, JNothing) => {
+            println("Received event")
+          }
+          case ApplicationEvent('a_request, JString("a param")) => {
+            println("Received request")
+            self reply ApplicationEvent('the_response, JString("reply content")).toJValue
+          }
         }
       }).start()
       println("Reliable actor server started.")

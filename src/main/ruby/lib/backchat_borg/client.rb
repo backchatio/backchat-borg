@@ -5,18 +5,49 @@ module Backchat
 
     class Client
 
+      attr_accessor :id
+
       def initialize(config)
+        @id = config[:id]
         @client = Backchat::Borg.context.socket(ZMQ::DEALER)
         @client.setsockopt ZMQ::LINGER, 0
         @client.setsockopt ZMQ::IDENTITY, config[:id]
-        @client.connect(config[:server])
+        @client.connect config[:server]
+
       end
 
-      def ask?
+    #   
+    # poller.poll(receiveTimeout.millis * 1000)
+    # if (poller.pollin(0)) {
+    #   val msg = ZMessage(client)
+    #   if (msg.messageType == "system" && msg.sender == "ERROR") {
+    #     msg.body match {
+    #       case "SERVER_UNAVAILABLE" ⇒ {
+    #         throw new ServerUnavailableException
+    #       }
+    #       case "TIMEOUT" ⇒ {
+    #         throw new RequestTimeoutException("The request to " + target + " with data: " + appEvent.toJson + " timed out.")
+    #       }
+    #     }
+    #   } else {
+    #     onReply(ApplicationEvent(msg.body))
+    #   }
+    # } else {
+    #   throw new RequestTimeoutException("The request to " + target + " with data: " + appEvent.toJson + " timed out.")
+    # }
+
+      def new_ccid
+        UUIDTools::UUID.random_create.to_s
       end
 
-      def tell(target, message)
-        ZMessage.new("", UUIDTools::UUID.random_create.to_s, "fireforget", "", target, message).send_to @client
+      def ask?(target, app_event)
+        message = app_event.is_a?(String) ? app_event : app_event.to_json
+        ZMessage.new("", new_ccid, "requestreply", id, target, message).send_to client
+      end
+
+      def tell(target, app_event)
+        message = app_event.is_a?(String) ? app_event : app_event.to_json
+        ZMessage.new("", new_ccid, "fireforget", "", target, message).send_to @client
       end
 
     end

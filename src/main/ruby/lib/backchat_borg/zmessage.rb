@@ -33,9 +33,9 @@ module Backchat
 
       def send_to(socket)
         @parts[0..-2].each { |part|
-          socket.send part, ZMQ::SNDMORE
+          socket.send_string part, ZMQ::SNDMORE
         }
-        socket.send @parts[-1], 0
+        socket.send_string @parts[-1], 0
       end
 
       def to_s

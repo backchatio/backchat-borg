@@ -1,7 +1,8 @@
 # -*- encoding: utf-8 -*-
 
+require 'yajl'
 require 'active_support'
-require 'zmq'
+require 'ffi-rzmq'
 require 'uuidtools'
 require 'logger'
 require 'backchat_borg/zmessage'
