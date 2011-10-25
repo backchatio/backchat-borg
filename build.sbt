@@ -28,7 +28,7 @@ libraryDependencies ++= Seq(
   "net.liftweb" %% "lift-json" % "2.4-M4",
   "net.liftweb" %% "lift-json-ext" % "2.4-M4",
   "org.scala-tools.time" %% "time" % "0.5",
-  "org.apache.zookeeper" % "zookeeper" % "3.4.0",
+  "org.apache.zookeeper" % "zookeeper" % "3.3.0",
   "se.scalablesolutions.akka" % "akka-stm" % "1.2",
   "com.mojolly.logback" %% "logback-akka" % "0.7.3-SNAPSHOT",
   "org.scala-tools.testing" %% "specs" % "1.6.9" % "test",

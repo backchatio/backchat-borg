@@ -1,6 +1,5 @@
 package backchat
-package zeromq
-
+package borg
 
 import akka.actor._
 import akka.actor.Actor._
@@ -16,10 +15,10 @@ import org.scala_tools.time.Imports._
 object ZeroMqBridge {
 
   def actorId(deviceName: String) = "backchat-∅MQ-" + deviceName + "-bridge"
-  private[zeromq] case object ExitIfExpired
+  private[borg] case object ExitIfExpired
   private case object Dispatch
 
-  private[zeromq] abstract class RequestDispatcher(bridge: ActorRef, protocolMessage: ProtocolMessage) extends Actor with Logging {
+  private[borg] abstract class RequestDispatcher(bridge: ActorRef, protocolMessage: ProtocolMessage) extends Actor with Logging {
     self.lifeCycle = Temporary
     val created = DateTime.now
 
@@ -47,18 +46,18 @@ object ZeroMqBridge {
     protected def dispatchRequest()
 
   }
-  private[zeromq] class DefaultRequestDispatcher(bridge: ActorRef, protocolMessage: ProtocolMessage) extends RequestDispatcher(bridge, protocolMessage) {
+  private[borg] class DefaultRequestDispatcher(bridge: ActorRef, protocolMessage: ProtocolMessage) extends RequestDispatcher(bridge, protocolMessage) {
     protected def dispatchRequest() {
       registry.actorsFor(protocolMessage.target).headOption foreach { _ ! ApplicationEvent(protocolMessage.payload) }
     }
   }
-  private[zeromq] class ServiceRegistryRequestDispatcher(bridge: ActorRef, protocolMessage: ProtocolMessage) extends RequestDispatcher(bridge, protocolMessage) {
+  private[borg] class ServiceRegistryRequestDispatcher(bridge: ActorRef, protocolMessage: ProtocolMessage) extends RequestDispatcher(bridge, protocolMessage) {
     protected def dispatchRequest() {
       registry.actorFor[ServiceRegistry] foreach { _ ! Request(protocolMessage.target, ApplicationEvent(protocolMessage.payload)) }
     }
   }
 
-  private[zeromq] class ReplyClient(ccid: String, reqFuture: CompletableFuture[Any])(implicit recvTimeout: Actor.Timeout) extends Actor with Logging {
+  private[borg] class ReplyClient(ccid: String, reqFuture: CompletableFuture[Any])(implicit recvTimeout: Actor.Timeout) extends Actor with Logging {
     self.id = "reply-" + ccid
     self.lifeCycle = Temporary
 
@@ -82,7 +81,7 @@ object ZeroMqBridge {
     }
   }
 
-  private[zeromq] class RemoteSubscriptionManager(publisher: ActorRef) extends Actor with Logging {
+  private[borg] class RemoteSubscriptionManager(publisher: ActorRef) extends Actor with Logging {
     self.id = "zeromq-remote-subscription-manager"
 
     private var topicSubscriptions = Map[String, Set[Subscription]]()
@@ -143,7 +142,7 @@ object ZeroMqBridge {
     }
   }
 
-  private[zeromq] class SubscriptionManager extends Actor with Logging {
+  private[borg] class SubscriptionManager extends Actor with Logging {
 
     self.id = "zeromq-subscription-manager"
 

@@ -1,6 +1,5 @@
 package backchat
-package zeromq
-
+package borg
 
 import akka.dispatch.{ Dispatchers }
 import collection.mutable.ListBuffer
@@ -76,7 +75,7 @@ trait PingPongObserver extends Actor { this: Actor ⇒
 
 object ZeroMQ extends Logging {
 
-  private[zeromq] val supervisor = Actor.actorOf(new Actor {
+  private[borg] val supervisor = Actor.actorOf(new Actor {
     self.faultHandler = OneForOneStrategy(List(classOf[Throwable]), 5, 5000)
 
     protected def receive: Receive = { case _ ⇒ }

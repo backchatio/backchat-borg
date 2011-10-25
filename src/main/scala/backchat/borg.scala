@@ -9,7 +9,7 @@ import net.liftweb.json.ext.JodaTimeSerializers
 import org.scala_tools.time.Imports._
 import org.joda.time.format.ISODateTimeFormat
 
-package object zeromq {
+package object borg {
 
   class BackchatFormats extends DefaultFormats {
     override val dateFormat = new DateFormat {
@@ -38,12 +38,12 @@ package object zeromq {
   val Pair = JZMQ.PAIR
   val SendMore = JZMQ.SNDMORE
   val NoBlock = JZMQ.NOBLOCK
-  private[zeromq] val MIN_DATE = new DateTime(0L)
-  private[zeromq] val ISO8601_DATE = ISODateTimeFormat.dateTime.withZone(DateTimeZone.UTC)
-  private[zeromq] implicit val formats: Formats = new BackchatFormats ++ JodaTimeSerializers.all
+  private[borg] val MIN_DATE = new DateTime(0L)
+  private[borg] val ISO8601_DATE = ISODateTimeFormat.dateTime.withZone(DateTimeZone.UTC)
+  private[borg] implicit val formats: Formats = new BackchatFormats ++ JodaTimeSerializers.all
 
   def newCcId = new Uuid().toString
 
-  private[zeromq] implicit def jvalueToBCJValue(jv: JValue) = new CoreExtensions.BackchatJValue(jv)
-  private[zeromq] implicit def string2BCString(s: String) = new CoreExtensions.BackchatString(s)
+  private[borg] implicit def jvalueToBCJValue(jv: JValue) = new CoreExtensions.BackchatJValue(jv)
+  private[borg] implicit def string2BCString(s: String) = new CoreExtensions.BackchatString(s)
 }

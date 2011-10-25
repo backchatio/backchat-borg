@@ -1,5 +1,5 @@
 package backchat
-package zeromq
+package borg
 package tests
 
 import org.scalatest.matchers.MustMatchers

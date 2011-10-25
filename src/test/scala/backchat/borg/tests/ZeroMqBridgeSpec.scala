@@ -1,5 +1,5 @@
 package backchat
-package zeromq
+package borg
 package tests
 
 import org.scalatest.matchers.MustMatchers
@@ -7,7 +7,7 @@ import org.zeromq.ZMQ
 import akka.actor._
 import org.multiverse.api.latches._
 import java.util.concurrent.TimeUnit
-import zeromq.Messages._
+import Messages._
 import Actor._
 import net.liftweb.json._
 import org.scalatest.{ BeforeAndAfterAll, WordSpec }

@@ -1,6 +1,5 @@
 package backchat
-package zeromq
-
+package borg
 
 import net.liftweb.json._
 import java.util.Locale.ENGLISH

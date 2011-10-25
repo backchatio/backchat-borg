@@ -1,5 +1,5 @@
 package backchat
-package zeromq
+package borg
 
 import net.liftweb.json.JsonParser
 import net.liftweb.json.JsonAST._

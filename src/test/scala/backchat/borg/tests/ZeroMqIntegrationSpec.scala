@@ -1,5 +1,5 @@
 package backchat
-package zeromq
+package borg
 package tests
 
 import akka.actor._
@@ -10,7 +10,7 @@ import net.liftweb.json._
 import org.multiverse.api.latches.StandardLatch
 import Messages._
 import java.util.concurrent.{ CountDownLatch, TimeUnit }
-import zeromq.ReliableClientBroker.{ AvailableServer, AvailableServers }
+import ReliableClientBroker.{ AvailableServer, AvailableServers }
 import org.scala_tools.time.Imports._
 
 object ZeroMqIntegrationSpec {

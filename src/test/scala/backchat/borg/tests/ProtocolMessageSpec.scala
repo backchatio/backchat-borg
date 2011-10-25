@@ -1,10 +1,10 @@
 package backchat
-package zeromq
+package borg
 package tests
 
 import org.scalatest.WordSpec
 import org.scalatest.matchers.MustMatchers
-import zeromq.ProtocolMessage.InvalidProtocolMessageException
+import ProtocolMessage.InvalidProtocolMessageException
 import akka.actor.Uuid
 
 class ProtocolMessageSpec extends WordSpec with MustMatchers {

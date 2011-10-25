@@ -1,12 +1,12 @@
 package backchat
-package zeromq
+package borg
 package tests
 
 import org.scalatest.matchers.MustMatchers
 import org.zeromq.ZMQ
 import org.multiverse.api.latches.StandardLatch
 import Messages._
-import zeromq.ReliableClientBroker._
+import ReliableClientBroker._
 import java.util.concurrent.{ CountDownLatch, TimeUnit }
 import akka.actor._
 import Actor._

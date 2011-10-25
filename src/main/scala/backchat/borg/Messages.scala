@@ -1,6 +1,5 @@
 package backchat
-package zeromq
-
+package borg
 
 import akka.actor._
 import net.liftweb.json._
