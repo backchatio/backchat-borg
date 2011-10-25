@@ -1,7 +1,7 @@
 # -*- encoding: utf-8 -*-
 
 $:.push File.expand_path("../lib", __FILE__)
-require "backchat_borg_ruby/version"
+require "backchat_borg/version"
 
 Gem::Specification.new do |s|
   s.name        = "backchat-borg-ruby"

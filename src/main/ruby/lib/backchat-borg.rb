@@ -1,7 +1,1 @@
-require 'activesupport'
-
-module Backchat
-  module Borg
-    
-  end
-end
+require "backchat_borg"
