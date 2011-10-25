@@ -5,7 +5,7 @@ import akka.actor._
 import Messages._
 import java.util.Locale.ENGLISH
 
-case class DeviceConfig(context: Context, name: String, serverAddress: String, pollTimeout: Long = -1)
+case class DeviceConfig(name: String, serverAddress: String, pollTimeout: Long = -1, context: Context = ZeroMQ.context)
 
 trait PubSubProxy extends ZeroMQDevicePart { self: ZeroMQDevice ⇒
 

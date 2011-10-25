@@ -45,3 +45,4 @@ publishTo <<= (version) { version: String =>
   else                                   Some("releases" at nexus+"releases/")
 }
 
+mainClass := Some("backchat.borg.samples.ReliableActorServer")

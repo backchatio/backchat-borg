@@ -1,6 +1,7 @@
 # -*- encoding: utf-8 -*-
+
 $:.push File.expand_path("../lib", __FILE__)
-require "backchat_client/version"
+require "backchat_borg_ruby/version"
 
 Gem::Specification.new do |s|
   s.name        = "backchat-borg-ruby"
@@ -21,6 +22,7 @@ Gem::Specification.new do |s|
   
   s.add_dependency("activesupport")
   s.add_dependency("addressable")  
+  s.add_dependency("uuidtools")
   s.add_dependency("zmq")
   #s.add_dependency("zookeeper")
   s.add_development_dependency('rspec')
