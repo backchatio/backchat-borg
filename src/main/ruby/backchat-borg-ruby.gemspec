@@ -23,7 +23,10 @@ Gem::Specification.new do |s|
   s.add_dependency("activesupport")
   s.add_dependency("addressable")  
   s.add_dependency("uuidtools")
-  s.add_dependency("zmq")
+  s.add_dependency("yajl-ruby")
+  s.add_dependency("ffi")
+  s.add_dependency("ffi-rzmq")
+  s.add_dependency("zmqmachine")
   #s.add_dependency("zookeeper")
   s.add_development_dependency('rspec')
 end
