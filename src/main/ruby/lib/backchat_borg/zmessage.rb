@@ -6,6 +6,12 @@ module Backchat
 
       DELIMITER = ""
 
+      def self.read(socket)
+        parts = []
+        socket.recv_strings parts
+        ZMessage.new(*parts)
+      end
+
       def initialize(*args)
         @parts = args
       end
