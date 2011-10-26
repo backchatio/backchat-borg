@@ -41,7 +41,7 @@ module Backchat
         UUIDTools::UUID.random_create.to_s
       end
 
-      def ask?(target, app_event)
+      def ask(target, app_event) # request reply
         message = app_event.is_a?(String) ? app_event : app_event.to_json
         ZMessage.new("", new_ccid, "requestreply", id, target, message).send_to client
       end
@@ -49,6 +49,18 @@ module Backchat
       def tell(target, app_event)
         message = app_event.is_a?(String) ? app_event : app_event.to_json
         ZMessage.new("", new_ccid, "fireforget", "", target, message).send_to @client
+      end
+
+      def listen(topic)
+        # listen to a pubsub topic  
+      end
+
+      def shout(topic)
+        # publish to pubsub topic
+      end
+
+      def disconnect 
+        @client.close
       end
 
     end

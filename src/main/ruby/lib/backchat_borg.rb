@@ -1,6 +1,8 @@
 # -*- encoding: utf-8 -*-
 
-require 'yajl'
+unless RUBY_PLATFORM == "java"
+  require 'yajl'
+end
 require 'active_support'
 require 'ffi-rzmq'
 require 'uuidtools'

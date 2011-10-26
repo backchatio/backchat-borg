@@ -8,6 +8,9 @@ RSpec.configure do |c|
 end
 
 shared_context "zeromq_context" do
+  before(:all) do
+    @zmq = Backchat::Borg.context
+  end
 
   after(:all) do
     Backchat::Borg.context = nil
