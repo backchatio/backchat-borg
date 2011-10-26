@@ -9,7 +9,7 @@ module Backchat
       attr_accessor :id, :receive_timeout
 
       def initialize(config)
-        @id, @receive_timeout = config[:id], (config[:receive_timeout]||3000)
+        @id, @receive_timeout = config[:id], (config[:receive_timeout]||3.seconds)
         @client = Backchat::Borg.context.socket(ZMQ::DEALER)
         @client.setsockopt ZMQ::LINGER, 0
         @client.setsockopt ZMQ::IDENTITY, config[:id]
@@ -22,17 +22,17 @@ module Backchat
         UUIDTools::UUID.random_create.to_s
       end
 
-      def tell(target, app_event) # request reply
+      def tell(target, app_event) 
         message = app_event.is_a?(String) ? app_event : app_event.to_json
         ZMessage.new("", new_ccid, "fireforget", "", target, message).send_to @client
       end
 
-      def ask(target, app_event, &on_reply)
+      def ask(target, app_event, &on_reply) # request reply
         raise "on_reply needs to be provided as a block to handle the reply of the message" if on_reply.nil?
         message = app_event.is_a?(String) ? app_event : app_event.to_json
         ZMessage.new("", new_ccid, "requestreply", id, target, message).send_to @client
         rc = @poller.poll(receive_timeout * 1000)
-        if rc >= 0
+        if rc > 0
           handle_reply target, message, &on_reply
         else
           raise RequestTimeoutException, "The request to #{target} with data: #{message} timed out."

@@ -3,10 +3,10 @@
 require 'rubygems'
 unless RUBY_PLATFORM == "java"
   require 'yajl'
-else
-  require 'json'
 end
 require 'active_support'
+require 'active_support/core_ext'
+
 require 'ffi-rzmq'
 require 'uuidtools'
 require 'logger'
