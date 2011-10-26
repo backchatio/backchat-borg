@@ -22,6 +22,13 @@ module Backchat
     def self.context
       @@context ||= ZMQ::Context.new(1)
     end
+
+    def self.context=(ctxt)
+      unless @@context.nil?
+        @@context.terminate
+      end
+      @@context = ctxt
+    end
     
   end
 end
