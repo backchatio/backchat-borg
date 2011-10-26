@@ -6,23 +6,13 @@ describe Backchat::Borg::Client do
 
   it "can enqueue a message to the server" do
     name = "zeromq-client-test"
-    router = @zmq.socket(ZMQ::ROUTER)
-    router.bind "inproc://#{name}.inproc"
-    poller = ZMQ::Poller.new
-    poller.register_readable router
-    got_message = false
-    client = Backchat::Borg::Client.new(:server => "inproc://#{name}.inproc" , :id => name)
+    create_server name
+    client = Backchat::Borg::Client.new(:server => "inproc://#{name}.inproc" , :id => "#{name}-client")
     begin
       client.tell "blah", "yada"
-      poller.poll
-      m = []
-      r = router.recv_strings m, ZMQ::NOBLOCK
-      m.size.should eql(7)
-      r.should eql(0)
+      @server.poll.size.should eql(7)
     ensure
       client.disconnect
-      poller.deregister_readable router
-      router.close
     end
   end
 

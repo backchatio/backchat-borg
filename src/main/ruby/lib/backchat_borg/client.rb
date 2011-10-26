@@ -23,7 +23,7 @@ module Backchat
       def initialize(config)
         @id, @receive_timeout = config[:id], (config[:receive_timeout]||3.seconds)
         raise "A client needs an :id" if @id.nil?
-        raise "A client needs a :server to connect to." if @config[:server].nil?
+        raise "A client needs a :server to connect to." if config[:server].nil?
         @client = Backchat::Borg.context.socket(ZMQ::DEALER)
         @client.setsockopt ZMQ::LINGER, 0
         @client.setsockopt ZMQ::IDENTITY, config[:id]
@@ -32,12 +32,6 @@ module Backchat
         @poller.register_readable @client
       end
 
-      #
-      # Creates a new call control id
-      #
-      def self.new_ccid
-        UUIDTools::UUID.random_create.to_s
-      end
 
       # 
       # Enqueues an event for the specified target with the specified payload
@@ -48,7 +42,7 @@ module Backchat
       def tell(target, app_event) 
         assert_params "tell", target, app_event
         message = app_event.is_a?(String) ? app_event : app_event.to_json
-        ZMessage.new("", new_ccid, "fireforget", "", target, message).send_to @client
+        ZMessage.new("", Backchat::Borg.new_ccid, "fireforget", "", target, message).send_to @client
       end
 
 
@@ -65,21 +59,13 @@ module Backchat
         assert_params "ask", target, app_event
         raise "on_reply needs to be provided as a block for ask to handle the reply of the message" if on_reply.nil?
         message = app_event.is_a?(String) ? app_event : app_event.to_json
-        ZMessage.new("", new_ccid, "requestreply", id, target, message).send_to @client
+        ZMessage.new("", Backchat::Borg.new_ccid, "requestreply", id, target, message).send_to @client
         rc = @poller.poll(receive_timeout * 1000)
         if rc > 0
           handle_reply target, message, &on_reply
         else
           raise RequestTimeoutException, "The request to #{target} with data: #{message} timed out."
         end
-      end
-
-      def listen(topic)
-        # listen to a pubsub topic  
-      end
-
-      def shout(topic)
-        # publish to pubsub topic
       end
 
       # 

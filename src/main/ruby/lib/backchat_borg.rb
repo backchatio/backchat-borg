@@ -12,7 +12,6 @@ require 'uuidtools'
 require 'logger'
 require 'backchat_borg/zmessage'
 require 'backchat_borg/error'
-require 'backchat_borg/client'
 
 module Backchat
   module Borg
@@ -35,8 +34,17 @@ module Backchat
       end
       @@context = ctxt
     end
+
+    #
+    # Creates a new call control id
+    #
+    def self.new_ccid
+      UUIDTools::UUID.random_create.to_s
+    end
     
   end
 end
 
 include Backchat::Borg
+require 'backchat_borg/client'
+
