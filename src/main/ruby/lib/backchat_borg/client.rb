@@ -6,49 +6,52 @@ module Backchat
 
     class Client
 
-      attr_accessor :id
+      attr_accessor :id, :receive_timeout
 
       def initialize(config)
-        @id = config[:id]
+        @id, @receive_timeout = config[:id], (config[:receive_timeout]||3000)
         @client = Backchat::Borg.context.socket(ZMQ::DEALER)
         @client.setsockopt ZMQ::LINGER, 0
         @client.setsockopt ZMQ::IDENTITY, config[:id]
         @client.connect config[:server]
-
+        @poller = ZMQ::Poller.new
+        @poller.register_readable @client
       end
-
-    #   
-    # poller.poll(receiveTimeout.millis * 1000)
-    # if (poller.pollin(0)) {
-    #   val msg = ZMessage(client)
-    #   if (msg.messageType == "system" && msg.sender == "ERROR") {
-    #     msg.body match {
-    #       case "SERVER_UNAVAILABLE" ⇒ {
-    #         throw new ServerUnavailableException
-    #       }
-    #       case "TIMEOUT" ⇒ {
-    #         throw new RequestTimeoutException("The request to " + target + " with data: " + appEvent.toJson + " timed out.")
-    #       }
-    #     }
-    #   } else {
-    #     onReply(ApplicationEvent(msg.body))
-    #   }
-    # } else {
-    #   throw new RequestTimeoutException("The request to " + target + " with data: " + appEvent.toJson + " timed out.")
-    # }
 
       def new_ccid
         UUIDTools::UUID.random_create.to_s
       end
 
-      def ask(target, app_event) # request reply
-        message = app_event.is_a?(String) ? app_event : app_event.to_json
-        ZMessage.new("", new_ccid, "requestreply", id, target, message).send_to client
-      end
-
-      def tell(target, app_event)
+      def tell(target, app_event) # request reply
         message = app_event.is_a?(String) ? app_event : app_event.to_json
         ZMessage.new("", new_ccid, "fireforget", "", target, message).send_to @client
+      end
+
+      def ask(target, app_event, &on_reply)
+        raise "on_reply needs to be provided as a block to handle the reply of the message" if on_reply.nil?
+        message = app_event.is_a?(String) ? app_event : app_event.to_json
+        ZMessage.new("", new_ccid, "requestreply", id, target, message).send_to @client
+        rc = @poller.poll(receive_timeout * 1000)
+        if rc >= 0
+          parts = []
+          @client.recv_strings parts
+          msg = ZMessage.new(*parts)
+          if msg.message_type == "system" && msg.sender == "ERROR"
+            case msg.body
+            when "SERVER_UNAVAILABLE"
+              raise ServerUnavailableException
+            when "TIMEOUT"
+              raise RequestTimeoutException, "The request to #{target} with data: #{message} timed out."
+            end
+          else
+            puts "body: #{msg.body}"
+            decoded = ActiveSupport::JSON.decode(msg.body)
+            puts "decoded: #{decoded} || class: #{decoded.class}"
+            on_reply.call(decoded)
+          end
+        else
+          raise RequestTimeoutException, "The request to #{target} with data: #{message} timed out."
+        end
       end
 
       def listen(topic)
@@ -60,6 +63,7 @@ module Backchat
       end
 
       def disconnect 
+        @poller.deregister_readable @client
         @client.close
       end
 

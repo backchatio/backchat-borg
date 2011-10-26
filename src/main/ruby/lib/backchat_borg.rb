@@ -1,14 +1,17 @@
 # -*- encoding: utf-8 -*-
 
+require 'rubygems'
 unless RUBY_PLATFORM == "java"
   require 'yajl'
+else
+  require 'json'
 end
 require 'active_support'
 require 'ffi-rzmq'
 require 'uuidtools'
 require 'logger'
 require 'backchat_borg/zmessage'
-
+require 'backchat_borg/error'
 require 'backchat_borg/client'
 
 module Backchat

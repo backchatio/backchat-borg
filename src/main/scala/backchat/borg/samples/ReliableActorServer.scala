@@ -14,7 +14,6 @@ object ReliableActorServer {
 
   def main(args: Array[String])  {
 
-
     val connectionLatch = new StandardLatch()
     val serverConfig = DeviceConfig(context, "reliable-actor-server", "tcp://127.0.0.1:13242")
 

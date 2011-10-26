@@ -27,7 +27,41 @@ describe Backchat::Borg::Client do
   end
 
   it "can request a message with a reply" do
-    pending
+    name = "zeromq-client-reply-test"
+    
+
+    #val latch = new StandardLatch
+    #val router = ZeroMQ startDevice {
+      #new BackchatZeroMqDevice(config) {
+        #val sock = context.socket(Router)
+        #poller += (sock -> (send _))
+        #override def send(zmsg: ZMessage) {
+          #if (zmsg.messageType == "requestreply" &&
+            #zmsg.sender == (name + "-client") &&
+            #zmsg.body == ApplicationEvent('pingping).toJson) {
+            #zmsg(sock)
+          #}
+        #}
+        #override def init() {
+          #super.init()
+          #sock.bind("inproc://" + name + ".inproc")
+          #latch.open()
+        #}
+        #override def dispose() {
+          #sock.close()
+          #super.dispose()
+        #}
+      #}
+    #}
+    #latch.tryAwait(2, TimeUnit.SECONDS) must be(true)
+    #val client = new BackchatZeroMqClient(name + "-client", context, name)
+    #val replyLatch = new StandardLatch
+    #client.request("the-target", ApplicationEvent('pingping)) { evt ⇒
+      #evt must equal(ApplicationEvent('pingping))
+      #replyLatch.open()
+    #}
+    #replyLatch.tryAwait(2, TimeUnit.SECONDS) must be(true)
+    #router.stop
   end
 
   it "should not block forever if a request doesn't get a reply" do
