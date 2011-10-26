@@ -33,17 +33,7 @@ module Backchat
         ZMessage.new("", new_ccid, "requestreply", id, target, message).send_to @client
         rc = @poller.poll(receive_timeout * 1000)
         if rc >= 0
-          msg = ZMessage.read(@client)
-          if msg.message_type == "system" && msg.sender == "ERROR"
-            case msg.body
-            when "SERVER_UNAVAILABLE"
-              raise ServerUnavailableException
-            when "TIMEOUT"
-              raise RequestTimeoutException, "The request to #{target} with data: #{message} timed out."
-            end
-          else
-            on_reply.call ActiveSupport::JSON.decode(msg.body)
-          end
+          handle_reply &on_reply
         else
           raise RequestTimeoutException, "The request to #{target} with data: #{message} timed out."
         end
@@ -60,6 +50,24 @@ module Backchat
       def disconnect 
         @poller.deregister_readable @client
         @client.close
+      end
+
+      private
+      def raise_if_error_reply(msg)
+        if msg.message_type == "system" && msg.sender == "ERROR"
+          case msg.body
+          when "SERVER_UNAVAILABLE"
+            raise ServerUnavailableException
+          when "TIMEOUT"
+            raise RequestTimeoutException, "The request to #{target} with data: #{message} timed out."
+          end
+        end
+      end
+
+      def handle_reply(&on_reply)
+        msg = ZMessage.read(@client)
+        raise_if_error_reply msg
+        on_reply.call ActiveSupport::JSON.decode(msg.body)
       end
 
     end
