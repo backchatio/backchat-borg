@@ -33,7 +33,7 @@ module Backchat
         ZMessage.new("", new_ccid, "requestreply", id, target, message).send_to @client
         rc = @poller.poll(receive_timeout * 1000)
         if rc >= 0
-          handle_reply &on_reply
+          handle_reply target, message, &on_reply
         else
           raise RequestTimeoutException, "The request to #{target} with data: #{message} timed out."
         end
@@ -64,7 +64,7 @@ module Backchat
         end
       end
 
-      def handle_reply(&on_reply)
+      def handle_reply(target, message, &on_reply)
         msg = ZMessage.read(@client)
         raise_if_error_reply msg
         on_reply.call ActiveSupport::JSON.decode(msg.body)
