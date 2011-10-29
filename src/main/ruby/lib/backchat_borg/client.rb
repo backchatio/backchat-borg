@@ -57,7 +57,7 @@ module Backchat
       #
       def ask(target, app_event, &on_reply) # request reply
         assert_params "ask", target, app_event
-        raise "on_reply needs to be provided as a block for ask to handle the reply of the message" if on_reply.nil?
+        #raise "on_reply needs to be provided as a block for ask to handle the reply of the message" if on_reply.nil?
         message = app_event.is_a?(String) ? app_event : app_event.to_json
         ZMessage.new("", Backchat::Borg.new_ccid, "requestreply", id, target, message).send_to @client
         rc = @poller.poll(receive_timeout * 1000)
@@ -91,7 +91,8 @@ module Backchat
       def handle_reply(target, message, &on_reply) #:nodoc:
         msg = ZMessage.read(@client)
         raise_if_error_reply msg
-        on_reply.call ActiveSupport::JSON.decode(msg.body)
+        decoded = ActiveSupport::JSON.decode(msg.body)
+        on_reply.nil? ? decoded : on_reply.call(decoded)
       end
 
       def assert_params(name, target, app_event)

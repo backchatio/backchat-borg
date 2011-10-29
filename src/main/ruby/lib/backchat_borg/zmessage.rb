@@ -38,14 +38,15 @@ module Backchat
       end
 
       def send_to(socket)
+        sender = socket.respond_to?(:raw_socket) ? socket.raw_socket : socket
         @parts[0..-2].each { |part|
-          socket.send_string part, ZMQ::SNDMORE
+          sender.send_string part, ZMQ::SNDMORE
         }
-        socket.send_string @parts[-1], 0
+        sender.send_string @parts[-1], 0
       end
 
       def to_s
-        "ZMessage(#{parts.map { |part| "\"#{part}\"" }.join(", ")})"
+        "ZMessage(#{@parts.map { |part| "'#{part}'" }.join(", ")})"
       end
 
       def append(data)
@@ -117,6 +118,10 @@ module Backchat
       def wrap(*pts) 
         @parts = pts + @parts
         self
+      end
+
+      def clone
+        ZMessage.new(*@parts.clone)
       end
 
       private

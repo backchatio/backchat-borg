@@ -7,11 +7,12 @@ end
 require 'active_support'
 require 'active_support/core_ext'
 
-require 'ffi-rzmq'
+require 'zmqmachine'
 require 'uuidtools'
 require 'logger'
 require 'backchat_borg/zmessage'
 require 'backchat_borg/error'
+Thread.abort_on_exception = true
 
 module Backchat
   module Borg
