@@ -39,10 +39,11 @@ module Backchat
 
       def send_to(socket)
         sender = socket.respond_to?(:raw_socket) ? socket.raw_socket : socket
+        rc = 0
         @parts[0..-2].each { |part|
-          sender.send_string part, ZMQ::SNDMORE
+          rc = sender.send_string part, ZMQ::SNDMORE
         }
-        sender.send_string @parts[-1], 0
+        rc = sender.send_string @parts[-1], 0
       end
 
       def to_s

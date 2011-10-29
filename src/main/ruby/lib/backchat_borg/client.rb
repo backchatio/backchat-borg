@@ -77,7 +77,7 @@ module Backchat
       end
 
       private
-      def raise_if_error_reply(msg) #:nodoc:
+      def raise_if_error_reply(target,message, msg) #:nodoc:
         if msg.message_type == "system" && msg.sender == "ERROR"
           case msg.body
           when "SERVER_UNAVAILABLE"
@@ -90,7 +90,7 @@ module Backchat
 
       def handle_reply(target, message, &on_reply) #:nodoc:
         msg = ZMessage.read(@client)
-        raise_if_error_reply msg
+        raise_if_error_reply target, message, msg
         decoded = ActiveSupport::JSON.decode(msg.body)
         on_reply.nil? ? decoded : on_reply.call(decoded)
       end

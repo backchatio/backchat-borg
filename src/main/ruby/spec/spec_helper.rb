@@ -75,7 +75,10 @@ class ServerHandler
     parts = messages.map { |msg| msg.copy_out_string }
     @last_message = ZMessage.new(*parts)
     @callback.call msg if @callback
-    rc = reply(last_message, ["event_name", "the data"]).send_to socket if should_reply
+    if should_reply
+      repl = reply(last_message, ["event_name", "the data"])
+      rc = repl.send_to socket 
+    end
     @message_received.open!
     rc
   end
@@ -87,10 +90,24 @@ class ServerHandler
   end
 
   def reply(msg, data)
+    decoded = ActiveSupport::JSON.decode(msg.body)
     r = msg.clone
-    r.target = r.sender
-    r.sender = nil
-    r.body = data.is_a?(String) ? data : data.to_json
+    case decoded.first
+    when "server_unavailable"
+      r.target = r.sender
+      r.sender = "ERROR"
+      r.message_type = "system"
+      r.body = "SERVER_UNAVAILABLE"
+    when "timeout"
+      r.target = r.sender
+      r.sender = "ERROR"
+      r.message_type = "system"
+      r.body = "TIMEOUT"
+    else
+      r.target = r.sender
+      r.sender = nil
+      r.body = data.is_a?(String) ? data : data.to_json
+    end
     r
   end
 

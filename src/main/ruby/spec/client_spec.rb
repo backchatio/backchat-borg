@@ -35,7 +35,6 @@ describe Backchat::Borg::Client do
   it "should not block forever if a request doesn't get a reply" do
     name = "zeromq-client-noreply-test"
     create_server :name => name, :reply => false 
-    @started.wait
     client = Backchat::Borg::Client.new(:server => "tcp://127.0.0.1:#{@server.port}" , :id => "#{name}-client")
     begin
       expect { 
@@ -47,19 +46,25 @@ describe Backchat::Borg::Client do
   end
 
   it "throws a ServerUnavailableException when the backend responds with that" do
-    #name = "zeromq-client-unavailable-test"
-    #client = Backchat::Borg::Client.new(:server => "tcp://127.0.0.1:13847" , :id => "#{name}-client")
-    #begin
-      #expect { client.ask(name, ["dontreply", { :some => "seed" }]) }.to raise_error(ServerUnavailableException)
-      
-    #ensure
-      #client.disconnect
-    #end
-    pending "until the client is backed by a broker device"
+    name = "zeromq-client-unavailable-test"
+    create_server :name => name
+    client = Backchat::Borg::Client.new(:server => "tcp://127.0.0.1:#{@server.port}" , :id => "#{name}-client")
+    begin
+      expect { client.ask(name, ["server_unavailable", { :some => "seed" }]) }.to raise_error(ServerUnavailableException)
+    ensure
+      client.disconnect
+    end
   end
 
   it "throws a RequestTimeoutException when the backend responds with that" do
-    pending "until the client is backed by a broker device"
+    name = "zeromq-client-timeout-test"
+    create_server :name => name
+    client = Backchat::Borg::Client.new(:server => "tcp://127.0.0.1:#{@server.port}" , :id => "#{name}-client")
+    begin
+      expect { client.ask(name, ["timeout", { :some => "seed" }]) }.to raise_error(RequestTimeoutException)
+    ensure
+      client.disconnect
+    end
   end
 end
 
