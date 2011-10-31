@@ -13,7 +13,7 @@ class ServiceRegistry(initialRegistry: Map[String, Queue[String]] = Map.empty, c
   protected var registry = initialRegistry
 
   protected def manageRegistry: Receive = {
-    case m@RegisterService(name, id) ⇒ {
+    case m @ RegisterService(name, id) ⇒ {
       logger debug "Registering worker '%s' to service '%s'.".format(id, name)
       if (registry.contains(name)) {
         val queue = registry(name)
@@ -24,7 +24,7 @@ class ServiceRegistry(initialRegistry: Map[String, Queue[String]] = Map.empty, c
       notifyCallback('registered -> registry(name))
       logger info "Registered worker '%s' to service '%s'.".format(id, name)
     }
-    case m@UnregisterService(name, id) ⇒ {
+    case m @ UnregisterService(name, id) ⇒ {
       logger debug "Unregistering worker '%s' from service '%s'.".format(id, name)
       if (registry.contains(name)) {
         val queue = registry(name)

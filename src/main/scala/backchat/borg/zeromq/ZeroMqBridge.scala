@@ -232,7 +232,7 @@ trait SubscriberBridge { parent: ZeroMqBridge ⇒
       logger trace ("Got Do: %s" format msg)
       sendToBridge(msg.toZMessage)
     }
-    case n@ProtocolMessage(_, "pubsub", Some("publish"), _, _) ⇒ {
+    case n @ ProtocolMessage(_, "pubsub", Some("publish"), _, _) ⇒ {
       subscriptionManager ! n
     }
   }
@@ -274,13 +274,12 @@ trait ZmqBridge { parent: ZeroMqBridge ⇒
 class RequestRequiresFutureException extends Exception("To make a request we require a future '!!' or '!!!'.")
 trait ClientBridge { parent: ZeroMqBridge ⇒
 
-
   protected def bridgeMessage: Receive = {
-    case m@ProtocolMessage(_, "requestreply", None, target, payload) ⇒ { // when sender is missing it's a reply
+    case m @ ProtocolMessage(_, "requestreply", None, target, payload) ⇒ { // when sender is missing it's a reply
       logger trace ("received a reply: %s" format m)
       registry.actorsFor(target).headOption foreach { _ ! ApplicationEvent(payload) }
     }
-    case m@ProtocolMessage(ccid, "system", Some("ERROR"), _, message) ⇒ {
+    case m @ ProtocolMessage(ccid, "system", Some("ERROR"), _, message) ⇒ {
       logger trace ("received an error: %s" format m)
       val replyActors = registry.actorsFor("reply-" + ccid)
       replyActors foreach { _ ! message }
@@ -317,10 +316,10 @@ trait ServerBridge { parent: ZeroMqBridge ⇒
   }, 2, 2, TimeUnit.MINUTES)
 
   protected def bridgeMessage: Receive = {
-    case m@ProtocolMessage(_, "requestreply", _, _, _) ⇒ { // when sender is present it's a request
+    case m @ ProtocolMessage(_, "requestreply", _, _, _) ⇒ { // when sender is present it's a request
       self startLink actorOf(new ZeroMqBridge.DefaultRequestDispatcher(self, m))
     }
-    case m@ProtocolMessage(_, "fireforget", _, target, payload) ⇒ {
+    case m @ ProtocolMessage(_, "fireforget", _, target, payload) ⇒ {
       registry.actorsFor(target).headOption foreach { _ ! ApplicationEvent(payload) }
     }
     case ('reply, m: ProtocolMessage) ⇒ {
@@ -334,13 +333,13 @@ trait ServiceRegistryBridge { parent: ZeroMqBridge with ServerBridge ⇒
   become(routeThroughRegistry orElse parent.receive, false)
 
   protected def routeThroughRegistry: Receive = {
-    case m@ProtocolMessage(_, "system", Some("HELLO"), _, _) ⇒ {
+    case m @ ProtocolMessage(_, "system", Some("HELLO"), _, _) ⇒ {
       registry.actorFor[ServiceRegistry] foreach { _ ! ServiceListRequest(m) }
     }
-    case m@ProtocolMessage(_, "requestreply", _, _, _) ⇒ { // when sender is present it's a request
+    case m @ ProtocolMessage(_, "requestreply", _, _, _) ⇒ { // when sender is present it's a request
       self startLink actorOf(new ZeroMqBridge.ServiceRegistryRequestDispatcher(self, m))
     }
-    case m@ProtocolMessage(_, "fireforget", _, target, payload) ⇒ {
+    case m @ ProtocolMessage(_, "fireforget", _, target, payload) ⇒ {
       registry.actorFor[ServiceRegistry] foreach { _ ! Enqueue(target, ApplicationEvent(payload)) }
     }
     case ServiceList(services, m) ⇒ sendToBridge {

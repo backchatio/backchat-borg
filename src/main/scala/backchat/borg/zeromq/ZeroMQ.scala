@@ -197,8 +197,7 @@ object ZeroMQ extends Logging {
             while (keepGoing) { keepGoing = !Thread.interrupted && logged { device.execute() } }
           } catch {
             case e: InterruptedException ⇒ {} // we expect this
-          }
-          finally {
+          } finally {
             try { device.dispose() } catch {
               case e ⇒ {
                 logger warn ("There was an error while shutting down the device: %s" format device.deviceName, e)

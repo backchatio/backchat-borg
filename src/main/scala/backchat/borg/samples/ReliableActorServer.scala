@@ -13,30 +13,28 @@ import backchat.borg.zeromq._
 object ReliableActorServer {
   val context = ZMQ.context(1)
 
-  def main(args: Array[String])  {
+  def main(args: Array[String]) {
 
     val connectionLatch = new StandardLatch()
     val serverConfig = DeviceConfig(context, "reliable-actor-server", "tcp://127.0.0.1:13242")
 
-    ZeroMQ startDevice (
-      new BackchatZeroMqDevice(serverConfig) with ServerActorBridge {
-        val routerAddress = serverConfig.serverAddress
+    ZeroMQ startDevice (new BackchatZeroMqDevice(serverConfig) with ServerActorBridge {
+      val routerAddress = serverConfig.serverAddress
 
-        override def init() = {
-          super.init()
-          connectionLatch.open()
-        }
+      override def init() = {
+        super.init()
+        connectionLatch.open()
       }
-    )
-    if(connectionLatch.tryAwait(1, TimeUnit.SECONDS)) {
+    })
+    if (connectionLatch.tryAwait(1, TimeUnit.SECONDS)) {
       val serverBridge = actorOf(new ZeroMqBridge(context, serverConfig.name) with ServerBridge).start()
       actorOf(new Actor {
         self.id = "the-target"
         protected def receive = {
-          case ApplicationEvent('pong, JNothing) => {
+          case ApplicationEvent('pong, JNothing) ⇒ {
             println("Received event")
           }
-          case ApplicationEvent('a_request, JString("a param")) => {
+          case ApplicationEvent('a_request, JString("a param")) ⇒ {
             println("Received request")
             self reply ApplicationEvent('the_response, JString("reply content")).toJValue
           }
