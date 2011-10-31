@@ -95,7 +95,7 @@ module Backchat
         on_reply.nil? ? decoded : on_reply.call(decoded)
       end
 
-      def assert_params(name, target, app_event)
+      def assert_params(name, target, app_event) #:nodoc:
         raise ArgumentError, "A target is required for #{name}" if target.nil?
         raise ArgumentError, "Event data is required for #{name}" if app_event.nil?
       end

@@ -6,7 +6,9 @@ import net.liftweb.json.JsonAST._
 
 class MalformedEventException(json: JValue) extends RuntimeException("Malformed json event:\n%s".format(json.toJson))
 sealed trait EventMessage extends NotNull {
-  def toJson: String
+  def toJson: String = toJValue.toJson
+  def toPrettyJson = toJValue.toPrettyJson
+  def toJValue: JValue
 }
 
 
@@ -28,6 +30,5 @@ object ApplicationEvent {
   }
 }
 case class ApplicationEvent(action: Symbol, data: JValue) extends EventMessage {
-  def toJson: String = toJValue.toJson
   def toJValue: JValue = JArray(JString(action.name) :: data :: Nil)
 }

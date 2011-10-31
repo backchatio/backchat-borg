@@ -39,10 +39,10 @@ libraryDependencies ++= Seq(
 
 parallelExecution in Test := false
 
-publishTo <<= (version) { version: String =>
+publishTo <<= (version) { vers: String =>
   val nexus = "http://maven.mojolly.com/content/repositories/"
-  if (version.trim.endsWith("SNAPSHOT")) Some("snapshots" at nexus+"snapshots/")
-  else                                   Some("releases" at nexus+"releases/")
+  if (vers.trim.endsWith("SNAPSHOT")) Some("snapshots" at nexus+"snapshots/")
+  else                                Some("releases" at nexus+"releases/")
 }
 
 mainClass := Some("backchat.borg.samples.ClientTestServer")

@@ -9,6 +9,7 @@ import akka.actor.Actor._
 import akka.actor.Actor
 import net.liftweb.json._
 import com.weiglewilczek.slf4s.Logging
+import backchat.borg.zeromq._
 
 
 object ClientTestServer extends Logging {

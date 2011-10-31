@@ -1,5 +1,6 @@
 package backchat
 package borg
+package zeromq
 
 import akka.util.Bootable
 

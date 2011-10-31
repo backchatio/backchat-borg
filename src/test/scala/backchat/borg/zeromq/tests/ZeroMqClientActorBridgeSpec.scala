@@ -1,5 +1,6 @@
 package backchat
 package borg
+package zeromq
 package tests
 
 import org.scalatest.WordSpec

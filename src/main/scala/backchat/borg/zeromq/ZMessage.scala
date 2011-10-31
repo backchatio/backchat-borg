@@ -1,5 +1,6 @@
 package backchat
 package borg
+package zeromq
 
 import java.nio.charset.Charset
 import collection.mutable.ListBuffer

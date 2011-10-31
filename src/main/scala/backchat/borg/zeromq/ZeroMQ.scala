@@ -1,5 +1,6 @@
 package backchat
 package borg
+package zeromq
 
 import akka.dispatch.{ Dispatchers }
 import collection.mutable.ListBuffer

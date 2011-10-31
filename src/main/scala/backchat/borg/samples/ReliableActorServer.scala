@@ -8,6 +8,7 @@ import org.zeromq.ZMQ
 import org.multiverse.api.latches.StandardLatch
 import java.util.concurrent.TimeUnit
 import net.liftweb.json._
+import backchat.borg.zeromq._
 
 object ReliableActorServer {
   val context = ZMQ.context(1)
