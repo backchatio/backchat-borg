@@ -8,8 +8,8 @@ import java.util.concurrent.TimeUnit
 import akka.actor.Actor._
 import akka.actor.Actor
 import net.liftweb.json._
-import com.weiglewilczek.slf4s.Logging
 import backchat.borg.zeromq._
+import mojolly.queue.ApplicationEvent
 
 
 object ClientTestServer extends Logging {

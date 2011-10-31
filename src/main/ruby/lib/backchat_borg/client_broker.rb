@@ -2,7 +2,7 @@
 
 module Backchat
   module Borg
-    module ReliableClientBroker
+    class ReliableClientBroker
       
     end
   end

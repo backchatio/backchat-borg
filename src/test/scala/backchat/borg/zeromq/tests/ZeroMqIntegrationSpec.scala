@@ -12,7 +12,6 @@ import org.multiverse.api.latches.StandardLatch
 import Messages._
 import java.util.concurrent.{ CountDownLatch, TimeUnit }
 import ReliableClientBroker.{ AvailableServer, AvailableServers }
-import org.scala_tools.time.Imports._
 
 object ZeroMqIntegrationSpec {
   val context = ZMQ context 1

@@ -10,8 +10,6 @@ import net.liftweb.json.JsonAST.JValue
 import java.util.concurrent.TimeUnit
 import akka.dispatch.{ CompletableFuture }
 import net.liftweb.json.Serialization
-import com.weiglewilczek.slf4s.Logging
-import org.scala_tools.time.Imports._
 
 object ZeroMqBridge {
 

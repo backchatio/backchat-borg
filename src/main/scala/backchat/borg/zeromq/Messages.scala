@@ -4,7 +4,6 @@ package zeromq
 
 import akka.actor._
 import net.liftweb.json._
-import java.util.Locale.ENGLISH
 
 object Messages {
 

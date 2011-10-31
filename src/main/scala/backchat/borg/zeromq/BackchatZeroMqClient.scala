@@ -7,8 +7,6 @@ import akka.actor._
 import org.zeromq.ZMQ.Poller
 import Messages._
 import collection.immutable.SortedSet
-import org.scala_tools.time.Imports._
-import java.util.Locale.ENGLISH
 
 trait ZmqClient {
 

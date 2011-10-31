@@ -4,7 +4,6 @@ package zeromq
 
 import akka.actor._
 import Messages._
-import java.util.Locale.ENGLISH
 
 case class DeviceConfig(context: Context, name: String, serverAddress: String, pollTimeout: Long = -1)
 

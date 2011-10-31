@@ -12,7 +12,6 @@ import java.util.concurrent.{ CountDownLatch, TimeUnit }
 import akka.actor._
 import Actor._
 import org.scalatest.{ BeforeAndAfterEach, BeforeAndAfterAll, WordSpec }
-import org.scala_tools.time.Imports._
 
 object ReliableClientBrokerSpec {
   val context = ZMQ context 1

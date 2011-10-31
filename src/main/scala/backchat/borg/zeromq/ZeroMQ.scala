@@ -10,7 +10,6 @@ import org.zeromq.ZMQ.{ Poller }
 import akka.agent.Agent
 import akka.actor._
 import akka.config.Supervision._
-import com.weiglewilczek.slf4s.Logging
 
 object MessageType extends Enumeration {
   type MessageType = Value

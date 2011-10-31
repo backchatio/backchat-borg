@@ -6,12 +6,13 @@ package tests
 import org.scalatest.matchers.MustMatchers
 import akka.actor._
 import Actor._
-import akka.util.duration._
+import akka.util.{Duration => AkkaDuration}
 import collection.immutable.Queue
 import org.zeromq.ZMQ
 import org.scalatest.{ BeforeAndAfterAll, WordSpec }
 import org.zeromq.ZMQ.Poller
 import akka.testkit._
+import java.util.concurrent.TimeUnit
 
 object ServiceRegistryBridgeSpec {
   val context = ZMQ context 1
@@ -36,7 +37,7 @@ class ServiceRegistryBridgeSpec extends WordSpec with MustMatchers with TestKit 
         override def preStart = {}
       }).start()
       val sut = actorOf(new ServiceRegistry(Map("message_channels" -> Queue(testActor.id)))).start()
-      within(2.seconds) {
+      within(AkkaDuration(2, TimeUnit.SECONDS)) {
         bridge ! ProtocolMessage(ccid, "requestreply", Some("the-client"), "message_channels", "[\"the_request\"]")
         expectMsgPF()(appEvtMatch)
       }
@@ -49,7 +50,7 @@ class ServiceRegistryBridgeSpec extends WordSpec with MustMatchers with TestKit 
         override def preStart = {}
       }).start()
       val sut = actorOf(new ServiceRegistry(Map("message_channels" -> Queue(testActor.id)))).start()
-      within(2.seconds) {
+      within(AkkaDuration(2, TimeUnit.SECONDS)) {
         bridge ! ProtocolMessage(ccid, "fireforget", None, "message_channels", "[\"the_request\"]")
         expectMsgPF()(appEvtMatch)
       }
@@ -66,9 +67,9 @@ class ServiceRegistryBridgeSpec extends WordSpec with MustMatchers with TestKit 
       val bridge = actorOf(new ZeroMqBridge(context, name) with ServerBridge with ServiceRegistryBridge).start()
       val sut = actorOf(new ServiceRegistry(Map("message_channels" -> Queue(testActor.id), "streams" -> Queue("blah")))).start()
       bridge ! ProtocolMessage(ccid, "system", Some("HELLO"), "", "")
-      poller.poll(2.seconds.toMicros) // lose the ready message
+      poller.poll(AkkaDuration(2, TimeUnit.SECONDS).toMicros) // lose the ready message
       ZMessage(proxy)
-      poller.poll(2.seconds.toMicros)
+      poller.poll(AkkaDuration(2, TimeUnit.SECONDS).toMicros)
       poller.pollin(0) must be(true)
       val msg = ZMessage(proxy)
       msg.sender must equal("CAPABILITIES")
