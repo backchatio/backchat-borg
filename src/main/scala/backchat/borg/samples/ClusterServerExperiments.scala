@@ -7,8 +7,11 @@ import java.io.File
 import org.apache.commons.lang.SystemUtils
 import com.eaio.uuid.UUID
 import java.util.concurrent.CountDownLatch
-import util.Random
-import org.I0Itec.zkclient.{ NetworkUtil, ZkClient, IDefaultNameSpace, ZkServer }
+import org.apache.zookeeper.server.ZooKeeperServer.BasicDataTreeBuilder
+import org.apache.zookeeper.server.persistence.FileTxnSnapLog
+import java.net.InetSocketAddress
+import org.apache.zookeeper.server.{ ServerCnxnFactory, NIOServerCnxnFactory, ZooKeeperServer }
+import com.twitter.zookeeper.ZookeeperClient
 
 object FileUtils {
 
@@ -31,54 +34,63 @@ object FileUtils {
     tempDir
   }
 }
-class ZookeeperRandomPortServer(sessionTimeout: Period = 100.millis, maxRetries: Int = 5) extends Logging {
+class ZookeeperRandomPortServer(sessionTimeout: Period = 100.millis) extends Logging {
 
   private val shutDownActions = mutable.ListBuffer.empty[() ⇒ Unit]
+  private var connectionFactory: ServerCnxnFactory = null
   private var started = false
   var port: Int = -1
 
-  private def newPort = Random.nextInt(55365) + 10000
+  private val zookeeperServer = new ZooKeeperServer(new FileTxnSnapLog(createTempDir, createTempDir), new BasicDataTreeBuilder())
 
-  private def newZookeeperServer(zkPort: Int) =
-    new ZkServer(createTempFile, createTempFile, noopNameSpace, zkPort, 500)
-
-  private val zookeeperServer: ZkServer = {
-    var count = 0
-    var zkPort = newPort
-    while (!NetworkUtil.isPortFree(zkPort)) {
-      zkPort = newPort
-      count += 1
-      if (count >= maxRetries) {
-        sys.error("Couldn't determine a free port")
-      }
-    }
-    port = zkPort
-    newZookeeperServer(zkPort)
-  }
-
-  def noopNameSpace = new IDefaultNameSpace {
-    def createDefaultNameSpace(p1: ZkClient) {}
-  }
-
-  def createTempFile = {
+  def createTempDir = {
     val tempDir = FileUtils.createTempDir()
     shutDownActions += { () ⇒ org.apache.commons.io.FileUtils.deleteDirectory(tempDir) }
-    tempDir.getAbsolutePath
+    tempDir
+  }
+
+  private def startNetwork() {
+    connectionFactory = new NIOServerCnxnFactory()
+    connectionFactory.configure(new InetSocketAddress(NetworkUtil.randomFreePort()), 1024)
+    connectionFactory.startup(zookeeperServer)
+
+    shutDownActions += { () ⇒ if (connectionFactory.isNotNull) connectionFactory.closeAll() }
+
+    port = zookeeperServer.getClientPort
   }
 
   def start() = {
     if (!started) {
-      zookeeperServer.start()
+      startNetwork()
       started = true
       logger info "Zookeeper Server started on [%s]".format(port)
     }
   }
 
+  def restart() {
+    if (port < 0) start()
+    else {
+      startNetwork()
+      logger info "Zookeeper Server restarted on [%s]".format(port)
+    }
+  }
+
   def stop() = {
     if (started) {
-      zookeeperServer.shutdown()
       shutDownActions foreach { _.apply() }
+      zookeeperServer.shutdown()
     }
+  }
+
+  def newClient(sessionTimeout: Duration = 3.seconds) = {
+    require(started, "The server needs to be started to spawn clients")
+    val cl = new ZookeeperClient("127.0.0.1:%s".format(port))
+    shutDownActions += { () ⇒ cl.close() }
+    cl
+  }
+
+  def expireClientSession(client: ZookeeperClient) {
+    zookeeperServer.closeSession(client.getHandle.getSessionId)
   }
 
 }

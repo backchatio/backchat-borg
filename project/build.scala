@@ -84,7 +84,6 @@ object BackchatBorgSettings {
         "net.liftweb" %% "lift-json-ext" % "2.4-M4",
         "org.scala-tools.time" %% "time" % "0.5",
         "org.slf4j" % "log4j-over-slf4j" % "1.6.1",
-        "zkclient" % "zkclient" % "0.3",
         "org.apache.hadoop.zookeeper" % "zookeeper" % "3.4.0",
         "org.apache.hadoop.zookeeper" % "zookeeper-recipes-lock" % "3.4.0",
         "se.scalablesolutions.akka" % "akka-stm" % "1.2",

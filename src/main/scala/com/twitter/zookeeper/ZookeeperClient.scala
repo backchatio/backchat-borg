@@ -4,31 +4,31 @@ import mojolly.LibraryImports._
 import scala.collection.JavaConversions._
 import scala.collection.mutable
 import scala.collection.immutable.Set
-import org.apache.zookeeper.{ CreateMode, KeeperException, Watcher, WatchedEvent, ZooKeeper }
+import org.apache.zookeeper._
 import org.apache.zookeeper.data.Stat
 import org.apache.zookeeper.ZooDefs.Ids
 import org.apache.zookeeper.Watcher.Event.EventType
 import org.apache.zookeeper.Watcher.Event.KeeperState
 import java.util.concurrent.CountDownLatch
 
-class ZookeeperClient(servers: String, sessionTimeout: Int, basePath: String,
+class ZookeeperClient(servers: String, sessionTimeout: Duration, basePath: String,
                       watcher: Option[ZookeeperClient ⇒ Unit]) extends Logging {
 
   @volatile
   private var zk: ZooKeeper = null
   connect()
 
-  def this(servers: String, sessionTimeout: Int, basePath: String) =
+  def this(servers: String, sessionTimeout: Duration, basePath: String) =
     this(servers, sessionTimeout, basePath, None)
 
-  def this(servers: String, sessionTimeout: Int, basePath: String, watcher: ZookeeperClient ⇒ Unit) =
+  def this(servers: String, sessionTimeout: Duration, basePath: String, watcher: ZookeeperClient ⇒ Unit) =
     this(servers, sessionTimeout, basePath, Some(watcher))
 
   def this(servers: String) =
-    this(servers, 3000, "", None)
+    this(servers, 3.seconds, "", None)
 
   def this(servers: String, watcher: ZookeeperClient ⇒ Unit) =
-    this(servers, 3000, "", Some(watcher))
+    this(servers, 3.seconds, "", Some(watcher))
 
   def this(config: ZookeeperClientConfig, watcher: Option[ZookeeperClient ⇒ Unit]) = {
     this(config.hostList,
@@ -41,7 +41,7 @@ class ZookeeperClient(servers: String, sessionTimeout: Int, basePath: String,
     this(config, None)
   }
 
-  def getHandle(): ZooKeeper = zk
+  def getHandle: ZooKeeper = zk
 
   /**
    * connect() attaches to the remote zookeeper and sets an instance variable.
@@ -53,7 +53,7 @@ class ZookeeperClient(servers: String, sessionTimeout: Int, basePath: String,
       zk.close()
       zk = null
     }
-    zk = new ZooKeeper(servers, sessionTimeout,
+    zk = new ZooKeeper(servers, sessionTimeout.getMillis.toInt,
       new Watcher {
         def process(event: WatchedEvent) {
           sessionEvent(assignLatch, connectionLatch, event)
@@ -103,7 +103,9 @@ class ZookeeperClient(servers: String, sessionTimeout: Int, basePath: String,
     zk.getChildren(makeNodePath(path), false)
   }
 
-  def close() = zk.close
+  def close() {
+    zk.close()
+  }
 
   def isAlive: Boolean = {
     // If you can get the root, then we're alive.
@@ -160,34 +162,34 @@ class ZookeeperClient(servers: String, sessionTimeout: Int, basePath: String,
   def watchNode(node: String, onDataChanged: Option[Array[Byte]] ⇒ Unit) {
     logger.debug("Watching node %s" format node)
     val path = makeNodePath(node)
-    def updateData {
+    def updateData() {
       try {
         onDataChanged(Some(zk.getData(path, dataGetter, null)))
       } catch {
         case e: KeeperException ⇒ {
           logger.warn("Failed to read node %s: %s" format (path, e))
-          deletedData
+          deletedData()
         }
       }
     }
 
-    def deletedData {
+    def deletedData() {
       onDataChanged(None)
       if (zk.exists(path, dataGetter) != null) {
         // Node was re-created by the time we called zk.exist
-        updateData
+        updateData()
       }
     }
     def dataGetter = new Watcher {
       def process(event: WatchedEvent) {
         if (event.getType == EventType.NodeDataChanged || event.getType == EventType.NodeCreated) {
-          updateData
+          updateData()
         } else if (event.getType == EventType.NodeDeleted) {
-          deletedData
+          deletedData()
         }
       }
     }
-    updateData
+    updateData()
   }
 
   /**

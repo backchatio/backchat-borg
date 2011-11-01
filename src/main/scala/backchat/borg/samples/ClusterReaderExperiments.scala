@@ -1,3 +1,4 @@
+/*
 package backchat.borg
 package samples
 
@@ -48,4 +49,4 @@ object ClusterReaderExperiments extends App with Logging {
   zk.deleteRecursive("/testing")
   logger info "created ephemeral node"
   latch.await()
-}
+}*/
