@@ -21,13 +21,13 @@ object ShellPrompt {
     (state: State) => {
       val currBranch = current findFirstMatchIn gitBranches map (_ group(1)) getOrElse "-"
       val currProject = Project.extract (state).currentProject.id
-      "%s:%s:%s> ".format (currBranch, currProject, LogbackAkkaSettings.buildVersion)
+      "%s:%s:%s> ".format (currBranch, currProject, BackchatBorgSettings.buildVersion)
     }
   }
  
 }
 
-object LogbackAkkaSettings {
+object BackchatBorgSettings {
   val buildOrganization = "com.mojolly.borg"
   val buildScalaVersion = "2.9.1"
   val buildVersion      = "0.0.4-SNAPSHOT"
@@ -56,7 +56,6 @@ object LogbackAkkaSettings {
   )
 
   val buildSettings = Defaults.defaultSettings ++ formatSettings ++ Seq(
-      name := "backchat-borg",
       version := buildVersion,
       organization := buildOrganization,
       scalaVersion := buildScalaVersion,
@@ -96,6 +95,9 @@ object LogbackAkkaSettings {
       libraryDependencies ++= compilerPlugins,
       autoCompilerPlugins := true,
       parallelExecution in Test := false,
+      ivyXML := <dependencies>
+          <exclude module="slf4j-log4j12" />
+        </dependencies>,
       publishTo <<= (version) { vers: String => 
         val nexus = "http://maven.mojolly.com/content/repositories/"
         if (vers.trim.endsWith("SNAPSHOT")) Some("snapshots" at nexus+"snapshots/")
@@ -128,9 +130,9 @@ object LogbackAkkaSettings {
   val projectSettings = buildSettings ++ packageSettings
 }
 
-object LogbackAkkaBuild extends Build {
+object BackchatBorgBuild extends Build {
 
-  import LogbackAkkaSettings._
+  import BackchatBorgSettings._
   val buildShellPrompt =  ShellPrompt.buildShellPrompt
 
   lazy val root = Project ("backchat-borg", file("."), settings = projectSettings ++ Seq(

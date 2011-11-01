@@ -10,6 +10,9 @@ import akka.actor.Actor
 import net.liftweb.json._
 import backchat.borg.zeromq._
 import mojolly.queue.ApplicationEvent
+import com.yammer.metrics.reporting.JmxReporter
+import com.yammer.metrics.core.VirtualMachineMetrics
+import mojolly.metrics.DefaultMetrics
 
 object ClientTestServer extends Logging {
   val context = ZMQ.context(1)
@@ -33,10 +36,15 @@ object ClientTestServer extends Logging {
   }
 
   def main(args: Array[String]) {
+    JmxReporter.startDefault(DefaultMetrics.defaultRegistry)
+
+    VirtualMachineMetrics.daemonThreadCount
 
     val connectionLatch = new StandardLatch()
     val serverConfig = DeviceConfig(context, "client-test-server", "tcp://127.0.0.1:13333")
 
+    actorOf(new ProcessMetricsCollector()).start() ! StartMetrics
+    actorOf(new SystemMetricsCollector()).start() ! StartMetrics
     ZeroMQ startDevice (new BackchatZeroMqDevice(serverConfig) with ServerActorBridge {
       val routerAddress = serverConfig.serverAddress
 
