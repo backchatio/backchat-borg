@@ -83,11 +83,13 @@ object BackchatBorgSettings {
         "net.liftweb" %% "lift-json" % "2.4-M4",
         "net.liftweb" %% "lift-json-ext" % "2.4-M4",
         "org.scala-tools.time" %% "time" % "0.5",
+        "org.slf4j" % "log4j-over-slf4j" % "1.6.1",
         "zkclient" % "zkclient" % "0.3",
         "org.apache.hadoop.zookeeper" % "zookeeper" % "3.4.0",
         "org.apache.hadoop.zookeeper" % "zookeeper-recipes-lock" % "3.4.0",
         "se.scalablesolutions.akka" % "akka-stm" % "1.2",
-        "com.mojolly.logback" %% "logback-akka" % "0.7.3-SNAPSHOT",
+        "com.mojolly.logback" %% "logback-akka" % "0.7.4-SNAPSHOT",
+        "org.scala-tools.testing" %% "specs" % "1.6.9" % "test",
         "org.specs2" %% "specs2" % "1.6.1" % "test",
         "org.scalatest" %% "scalatest" % "1.6.1" % "test",
         "se.scalablesolutions.akka" % "akka-testkit" % "1.2" % "test"
@@ -97,6 +99,7 @@ object BackchatBorgSettings {
       parallelExecution in Test := false,
       ivyXML := <dependencies>
           <exclude module="slf4j-log4j12" />
+          <exclude module="log4j" />
         </dependencies>,
       publishTo <<= (version) { vers: String => 
         val nexus = "http://maven.mojolly.com/content/repositories/"

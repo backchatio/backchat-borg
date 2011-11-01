@@ -1,16 +1,14 @@
 package backchat
 package borg
-package zookeeper
-package tests
+package samples
 
 import collection.mutable
 import java.io.File
 import org.apache.commons.lang.SystemUtils
 import com.eaio.uuid.UUID
+import java.util.concurrent.CountDownLatch
 import util.Random
 import org.I0Itec.zkclient.{ NetworkUtil, ZkClient, IDefaultNameSpace, ZkServer }
-
-class NoRandomPortAvailableException extends Exception
 
 object FileUtils {
 
@@ -33,7 +31,8 @@ object FileUtils {
     tempDir
   }
 }
-class ZookeeperTestServer(sessionTimeout: Period = 100.millis, maxRetries: Int = 5) extends Logging {
+class ZookeeperRandomPortServer(sessionTimeout: Period = 100.millis, maxRetries: Int = 5) extends Logging {
+
   private val shutDownActions = mutable.ListBuffer.empty[() ⇒ Unit]
   private var started = false
   var port: Int = -1
@@ -81,4 +80,14 @@ class ZookeeperTestServer(sessionTimeout: Period = 100.millis, maxRetries: Int =
       shutDownActions foreach { _.apply() }
     }
   }
+
+}
+
+object ClusterServerExperiments extends App {
+
+  val latch = new CountDownLatch(2)
+  val serv = new ZookeeperRandomPortServer()
+  serv.start()
+  sys.addShutdownHook(serv.stop())
+  latch.await()
 }

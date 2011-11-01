@@ -1,0 +1,67 @@
+<configuration>
+  <conversionRule conversionWord="levelcolor"
+                    converterClass="mojolly.logback.LevelColorizer" />
+
+  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <!-- encoders are assigned the type
+         ch.qos.logback.classic.encoder.PatternLayoutEncoder by default -->
+    <encoder>
+      <pattern>[%t] [%4levelcolor] [%d{ISO8601}] %c{1}: %m%n</pattern>
+      <!--<pattern>%-4relative [%thread] %-5level %logger{35} - %msg %n</pattern>-->
+    </encoder>
+  </appender>
+
+  <!--<appender name="R" class="ch.qos.logback.core.rolling.RollingFileAppender">-->
+    <!--<File>./logs/backchat.log</File>-->
+    <!--<encoder>-->
+      <!--<pattern>[%t] [%4p] [%d{ISO8601}] %c{1}: %m%n</pattern>-->
+    <!--</encoder>-->
+    <!--<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">-->
+      <!--<fileNamePattern>./logs/backchat.log.%d{yyyy-MM-dd-HH}</fileNamePattern>-->
+    <!--</rollingPolicy>-->
+  <!--</appender>-->
+
+  <!--<appender name="LOGSTASH" class="com.mojolly.logback.LogstashRedisAppender">-->
+    <!--<param name="QueueName" value="backchat_dev"/>-->
+    <!--<param name="Host" value="192.168.56.20"/>-->
+    <!--<layout class="com.mojolly.logback.LogstashRedisLayout">-->
+      <!--<param name="ApplicationName" value="backchat-dev"/>-->
+    <!--</layout>-->
+  <!--</appender>-->
+
+  <!--<appender name="ACTORS" class="com.mojolly.logback.ActorAppender">-->
+    <!--<appender-ref ref="STDOUT"/>-->
+    <!--&lt;!&ndash;<appender-ref ref="LOGSTASH" />&ndash;&gt;-->
+  <!--</appender>-->
+
+  <!--
+  <appender name="FLOWDOCK" class="mojolly.logback.FlowdockAppender">
+    <param name="token" value="blabla"/>
+    <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+      <layout class="mojolly.logback.FlowdockLayout">
+        <param name="source" value="Backchat"/>
+        <param name="fromName" value="Backchat"/>
+        <param name="fromAddress" value="support@backchat.io"/>
+      </layout>
+    </encoder>
+    <filter class="ch.qos.logback.core.filter.EvaluatorFilter">
+      <evaluator class="ch.qos.logback.classic.boolex.OnMarkerEvaluator">
+        <marker>ALERT</marker>
+      </evaluator>
+      <OnMismatch>DENY</OnMismatch>
+      <OnMatch>NEUTRAL</OnMatch>
+    </filter>
+  </appender>
+  -->
+
+  <!--<logger name="akka" level="INFO" />-->
+  <logger name="mojolly" level="INFO" />
+
+  <logger name="backchat" level="TRACE" />
+  <root level="INFO">
+    <appender-ref ref="STDOUT"/>
+    <!--<appender-ref ref="FLOWDOCK"/>-->
+    <!--<appender-ref ref="LOGSTASH" />-->
+  </root>
+
+</configuration>
