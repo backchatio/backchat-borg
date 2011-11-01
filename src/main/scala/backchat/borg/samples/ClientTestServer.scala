@@ -43,8 +43,9 @@ object ClientTestServer extends Logging {
     val connectionLatch = new StandardLatch()
     val serverConfig = DeviceConfig(context, "client-test-server", "tcp://127.0.0.1:13333")
 
-    actorOf(new ProcessMetricsCollector()).start() ! StartMetrics
-    actorOf(new SystemMetricsCollector()).start() ! StartMetrics
+    actorOf(new ProcessMetricsCollector()).start()
+    actorOf(new SystemMetricsCollector()).start()
+
     ZeroMQ startDevice (new BackchatZeroMqDevice(serverConfig) with ServerActorBridge {
       val routerAddress = serverConfig.serverAddress
 
@@ -53,6 +54,7 @@ object ClientTestServer extends Logging {
         connectionLatch.open()
       }
     })
+
     if (connectionLatch.tryAwait(1, TimeUnit.SECONDS)) {
       val serverBridge = actorOf(new ZeroMqBridge(context, serverConfig.name) with ServerBridge).start()
       actorOf(new TestHandler("the-target")).start()

@@ -96,6 +96,12 @@ abstract class MetricsCollector[StatsClass <: Stat](interval: Duration = 30.seco
   private var probeTasks: Option[ScheduledTask] = None
 
   import ProcessMetricsCollector.ProcessInfo
+
+  override def preStart() {
+    logger info "Started %s".format(getClass.getSimpleName)
+    self ! StartMetrics
+  }
+
   protected var processInfo: ProcessInfo = _
 
   protected def readLong(fn: StatsClass ⇒ Long, defaultValue: Long = -1L) = {
