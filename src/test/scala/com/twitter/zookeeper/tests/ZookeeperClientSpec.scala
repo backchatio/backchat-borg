@@ -2,22 +2,23 @@ package com.twitter.zookeeper
 package tests
 
 import java.net.{Socket, ConnectException}
-import org.apache.zookeeper.{CreateMode, Watcher, WatchedEvent, ZooKeeper}
+import org.apache.zookeeper.CreateMode
 import org.apache.zookeeper.CreateMode._
 import org.apache.zookeeper.KeeperException.NoNodeException
-import org.apache.zookeeper.data.{ACL, Id}
+import org.apache.zookeeper.data.Id
 import org.specs._
 import scala.collection.mutable
+import backchat.borg.zookeeper.tests.ZookeeperTestServer
 
 class ZookeeperClientSpec extends Specification {
-  val config = new TestConfig
-  val hostlist = config.hostList
 
+  val server: ZookeeperTestServer = new ZookeeperTestServer()
   doBeforeSpec {
-    // we need to be sure that a ZooKeeper server is running in order to test
-    println("Testing connection to ZooKeeper server at %s...".format(hostlist))
-    val socketPort = hostlist.split(":")
-    new Socket(socketPort(0), socketPort(1).toInt) mustNot throwA[ConnectException]
+    server.start()
+  }
+  
+  doAfterSpec {
+    server.stop()
   }
 
   "ZookeeperClient" should {
@@ -25,8 +26,11 @@ class ZookeeperClientSpec extends Specification {
     var zkClient : ZookeeperClient = null
 
     doFirst {
-      println("Attempting to connect to ZooKeeper server %s...".format(hostlist))
-      zkClient = new ZookeeperClient(config, None)
+      val hl = "127.0.0.1:%s".format(server.port)
+      println("Attempting to connect to ZooKeeper server %s...".format(hl))
+      zkClient = new ZookeeperClient(new ZookeeperClientConfig {
+        def hostList = hl
+      }, None)
     }
 
     doLast {

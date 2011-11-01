@@ -9,7 +9,7 @@ import org.apache.commons.lang.SystemUtils
 import com.eaio.uuid.UUID
 import org.apache.zookeeper.server.persistence.FileTxnSnapLog
 import org.apache.zookeeper.server.ZooKeeperServer.BasicDataTreeBuilder
-import org.apache.zookeeper.server.{NIOServerCnxnFactory, ZooKeeperServer, ServerCnxnFactory}
+import org.apache.zookeeper.server.{ NIOServerCnxnFactory, ZooKeeperServer, ServerCnxnFactory }
 import java.net.InetSocketAddress
 import com.twitter.zookeeper._
 
@@ -86,7 +86,7 @@ class ZookeeperTestServer(sessionTimeout: Period = 100.millis, maxRetries: Int =
   def newClient(sessionTimeout: Duration = 3.seconds) = {
     require(started, "The server needs to be started to spawn clients")
     val cl = new ZookeeperClient("127.0.0.1:%s".format(port))
-    shutDownActions += { () => cl.close() }
+    shutDownActions += { () ⇒ cl.close() }
     cl
   }
 
