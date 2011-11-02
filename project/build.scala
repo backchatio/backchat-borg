@@ -2,6 +2,7 @@ import sbt._
 import Keys._
 import com.typesafe.sbtscalariform._
 import ScalariformPlugin._
+import sbtprotobuf.{ProtobufPlugin=>PB}
 
 // Shell prompt which show the current project, git branch and build version
 // git magic from Daniel Sobral, adapted by Ivan Porto Carrero to also work with git flow branches
@@ -55,7 +56,7 @@ object BackchatBorgSettings {
     compilerPlugin("org.scala-tools.sxr" % "sxr_2.9.0" % "0.2.7")
   )
 
-  val buildSettings = Defaults.defaultSettings ++ formatSettings ++ Seq(
+  val buildSettings = Defaults.defaultSettings ++ PB.protobufSettings ++ formatSettings ++ Seq(
       version := buildVersion,
       organization := buildOrganization,
       scalaVersion := buildScalaVersion,
@@ -73,29 +74,30 @@ object BackchatBorgSettings {
         "GlassFish Repo" at "http://download.java.net/maven/glassfish/",
         "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
         "TypeSafe releases" at "http://repo.typesafe.com/typesafe/releases/",
+        "Boundary Public Repo" at "http://maven.boundary.com/artifactory/repo",
         "Akka Repo" at "http://akka.io/repository"
       ),
       //retrieveManaged := true,
       (excludeFilter in formatSources) <<= (excludeFilter) (_ || "*Spec.scala"),
       libraryDependencies ++= Seq(
+        "com.google.protobuf" % "protobuf-java" % "2.4.1",
         "com.mojolly.library" %% "library-core" % "0.9.7-SNAPSHOT",
         "commons-codec" % "commons-codec" % "1.5",
-        "net.liftweb" %% "lift-json" % "2.4-M4",
         "net.liftweb" %% "lift-json-ext" % "2.4-M4",
-        "org.scala-tools.time" %% "time" % "0.5",
         "org.slf4j" % "log4j-over-slf4j" % "1.6.1",
         "org.apache.hadoop.zookeeper" % "zookeeper" % "3.4.0",
         "org.apache.hadoop.zookeeper" % "zookeeper-recipes-lock" % "3.4.0",
         "se.scalablesolutions.akka" % "akka-stm" % "1.2",
         "com.mojolly.logback" %% "logback-akka" % "0.7.4-SNAPSHOT",
-        "org.scala-tools.testing" %% "specs" % "1.6.9" % "test",
         "org.specs2" %% "specs2" % "1.6.1" % "test",
         "org.scalatest" %% "scalatest" % "1.6.1" % "test",
         "se.scalablesolutions.akka" % "akka-testkit" % "1.2" % "test"
       ),
+      compileOrder := CompileOrder.JavaThenScala,
       libraryDependencies ++= compilerPlugins,
       autoCompilerPlugins := true,
       parallelExecution in Test := false,
+      unmanagedResourceDirectories in Compile <+= (sourceDirectory in PB.protobufConfig).identity,
       ivyXML := <dependencies>
           <exclude module="slf4j-log4j12" />
           <exclude module="log4j" />
