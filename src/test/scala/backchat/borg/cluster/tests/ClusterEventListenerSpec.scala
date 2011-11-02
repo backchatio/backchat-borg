@@ -3,12 +3,12 @@ package cluster
 package tests
 
 import org.specs2._
-import specification.After
+import execute.Result
 import akka.actor._
 import Actor._
 import cluster.ClusterEvents._
-import org.multiverse.api.latches.StandardLatch
 import java.util.concurrent.{CountDownLatch, TimeUnit}
+import org.multiverse.api.latches.StandardLatch
 
 class ClusterEventListenerSpec extends Specification { def is =
 
@@ -18,16 +18,16 @@ class ClusterEventListenerSpec extends Specification { def is =
       "not send a connected event to the listener if the cluster is not connected" ! context.dontSendConnectedOnDisconnected ^ br^
     "when handling a RemoveListener message" ! context.onRemoveListener ^ br^ bt^
     "when handling a Connected message" ^
-      "notify listeners" ! pending ^
-      "do nothing if already connected" ! pending ^ br^ bt^
+      "notify listeners" ! context.notifyOnConnected ^
+      "do nothing if already connected" ! context.notifyOnlyOnceOnConnected ^ br^ bt^
     "when handling a NodesChanged message" ^
-      "notify listeners" ! pending ^
-      "do nothing if not connected" ! pending ^ br^ bt^
+      "notify listeners" ! context.notifyOfNodeChanged ^
+      "do nothing if not connected" ! context.dontNotifyOfChangesIfDisconnected ^ br^ bt^
     "when handling a Disconnected message" ^
-      "disconnects the cluster" ! pending ^
-      "notify listeners" ! pending ^
-      "do nothing if not connected" ! pending ^ br^
-    "when handling a Shutdown message" ! pending ^ end
+      "disconnects the cluster" ! context.disconnectsCluster ^
+      "notify listeners" ! context.notifyOnDisconnect ^
+      "do nothing if not connected" ! context.dontNotifyOfDisconnectedIfDisconnected ^ br^
+    "when handling a Shutdown message" ! context.shutdownProperly ^ end
   
   def context = new ListenerContext()
 
@@ -40,69 +40,151 @@ class ClusterEventListenerSpec extends Specification { def is =
     import ClusterEventListener._
     import ListenerContext._
 
-    val latch = new StandardLatch
-
+    def withEventListener(fn: (ActorRef, StandardLatch) => Result) = {
+      val act = actorOf(new ClusterEventListener).start()
+      val res = fn(act, new StandardLatch)
+      act ! Shutdown
+      res
+    }
+    def withEventListenerWithCallback(amount: Int)(fn: (ActorRef, CountDownLatch) => Result) = {
+      val callbackCounter = new CountDownLatch(3)
+      val callback = actorOf(new Actor {
+        protected def receive = {
+          case Shutdown => self.stop()
+          case _ => callbackCounter.countDown()
+        }
+      }).start()
+      val act = actorOf(new ClusterEventListener(Some(callback))).start()
+      val res = fn(act, callbackCounter)
+      act ! Shutdown
+      res
+    }
     def newListener(pf: Receive) = actorOf(new Actor { protected def receive = pf orElse { case _ => } }).start()
-    
-    def sendConnectedEvent = {
-      val eventListener = actorOf(new ClusterEventListener).start()
+    def withListener(pf: Receive)(fn: ActorRef => Result) = {
+      val act = newListener(pf)
+      val res = fn(act)
+      act.stop()
+      res
+    }
+
+    def sendConnectedEvent = withEventListener { (eventListener, latch) =>
       eventListener ! Connected(nodes)
       var calls = 0
       var current = Set.empty[Node]
-      val listener = newListener {
+      withListener({
+        case Connected(n) => {
+          current = n
+          calls += 1
+          latch.open()
+        }
+      }) { listener =>
+        eventListener ? Messages.AddListener(listener)
+        latch.tryAwait(2, TimeUnit.SECONDS)
+        (calls must_== 1) and (current.size must_== 1) and (current.head.id must_== 2)
+      }
+    }
+
+    def dontSendConnectedOnDisconnected = withEventListener { (eventListener, latch) =>
+      var calls = 0
+      withListener({
+        case Connected(_) => {
+          calls += 1
+          latch.open()
+        }
+      }) { listener => 
+        eventListener ? Messages.AddListener(listener)
+        val res = latch.tryAwait(2, TimeUnit.SECONDS)
+        res must beFalse and (calls must_== 0)
+      }
+      
+    }
+
+    def onRemoveListener = withEventListenerWithCallback(3) { (eventListener, callbackCounter) =>
+      var calls = 0
+      withListener({ case Connected(_) | NodesChanged(_) => calls += 1 }) { listener => 
+        val key = (eventListener ? Messages.AddListener(listener)).as[Messages.AddedListener].get.key
+        eventListener ! Connected(nodes)
+        eventListener ! Messages.RemoveListener(key)
+        eventListener ! NodesChanged(nodes)
+        callbackCounter.await(2, TimeUnit.SECONDS)
+        calls must_== 1
+      }
+    }
+    
+    def notifyOnConnected = withEventListener { (eventListener, latch) =>
+      var calls = 0
+      var current = Set.empty[Node]
+      withListener({
         case ClusterEvents.Connected(n) => {
           current = n
           calls += 1
           latch.open()
         }
+      }) { listener => 
+        eventListener ! Messages.AddListener(listener)
+        eventListener ! Connected(nodes)
+        latch.tryAwait(2, TimeUnit.SECONDS)
+        (calls must_== 1) and (current.size must_== 1) and (current.head.id must_== 2)
       }
-      eventListener ? Messages.AddListener(listener)
-      latch.tryAwait(2, TimeUnit.SECONDS)
-      listener.stop()
-      eventListener ! Shutdown
-      println(current)
-      (calls must_== 1) and (current.size must_== 1) and (current.head.id must_== 2)
     }
 
-    def dontSendConnectedOnDisconnected = {
-      val eventListener = actorOf(new ClusterEventListener).start()
-      var counted = 0
-      val listener = newListener {
-        case Connected(_) => {
-          counted += 1
+    def notifyOnlyOnceOnConnected = withEventListenerWithCallback(3) { (eventListener, callbackCounter) =>
+      var calls = 0
+      var current = Set.empty[Node]
+      withListener({
+        case Connected(n) => {
+          current = n
+          calls += 1
+        }
+      }){ listener =>
+        eventListener ! Messages.AddListener(listener)
+        eventListener ! Connected(nodes)
+        eventListener ! Connected(nodes)
+        callbackCounter.await(2, TimeUnit.SECONDS)
+        (calls must_== 1) and (current.size must_== 1) and (current.head.id must_== 2)
+      }
+    }
+
+    def notifyOfNodeChanged = withEventListenerWithCallback(3) { (eventListener, callbackCounter) =>
+      var calls = 0
+      var current = Set.empty[Node]
+      withListener({
+        case NodesChanged(n) => {
+          calls += 1 
+          current = n
+        }
+      }){ listener =>
+        eventListener ! Connected(nodes)
+        eventListener ! Messages.AddListener(listener)
+        eventListener ! NodesChanged(nodes)
+        callbackCounter.await(2, TimeUnit.SECONDS)
+        (calls must_== 1) and (current.size must_== 1) and (current.head.id must_== 2)
+      }
+    }
+
+    def dontNotifyOfChangesIfDisconnected = withEventListener { (eventListener, latch) =>
+      var calls = 0
+      withListener({
+        case Connected => calls += 1
+        case NodesChanged(_) => {
+          calls += 1
           latch.open()
         }
+      }) { listener =>
+        eventListener ! Connected(nodes)
+        eventListener ! Messages.AddListener(listener)
+        eventListener ! NodesChanged(nodes)
+        latch.tryAwait(2, TimeUnit.SECONDS) must beTrue and (calls must_== 1)
       }
-      eventListener ? Messages.AddListener(listener)
-      val res = latch.tryAwait(2, TimeUnit.SECONDS)
-      listener.stop()
-      eventListener ! Shutdown
-      res must beFalse and (counted must_== 0)
     }
 
-    def onRemoveListener = {
-      val callbackCounter = new CountDownLatch(3)
-      val callback = actorOf(new Actor {
-        protected def receive = {
-          case Connected(_) | Messages.RemoveListener(_) | NodesChanged(_) => callbackCounter.countDown()
-        }
-      }).start()
-      val eventListener = actorOf(new ClusterEventListener(Some(callback))).start()
-      var calls = 0
-      val listener = newListener {
-        case Connected(_) | NodesChanged(_) => calls += 1
-      }
-      
-      val key = (eventListener ? Messages.AddListener(listener)).as[Messages.AddedListener].get.key
-      eventListener ! Connected(nodes)
-      eventListener ! Messages.RemoveListener(key)
-      eventListener ! NodesChanged(nodes)
-      callbackCounter.await(2, TimeUnit.SECONDS)
-      listener.stop()
-      eventListener ! Shutdown
-      calls must_== 1
-    }
+    def disconnectsCluster = pending
 
+    def notifyOnDisconnect = pending
+
+    def dontNotifyOfDisconnectedIfDisconnected = pending
+
+    def shutdownProperly = pending
 
   }
 }

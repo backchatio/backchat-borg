@@ -81,7 +81,7 @@ class ClusterEventListener(callback: Option[ActorRef]) extends Actor with Loggin
     logger.debug("Handling Connected(%s) message".format(nodes))
 
     if (_connected) {
-      logger.error("Received a Connected event when already connected")
+      logger.warn("Received a Connected event when already connected")
     } else {
       _connected = true
       currentNodes = nodes
@@ -99,7 +99,7 @@ class ClusterEventListener(callback: Option[ActorRef]) extends Actor with Loggin
 
       notifyListeners(ClusterEvents.Disconnected)
     } else {
-      logger.error("Received a Disconnected event when disconnected")
+      logger.warn("Received a Disconnected event when disconnected")
     }
   }
 
@@ -111,7 +111,7 @@ class ClusterEventListener(callback: Option[ActorRef]) extends Actor with Loggin
 
       notifyListeners(ClusterEvents.NodesChanged(availableNodes))
     } else {
-      logger.error("Received a NodesChanged event when disconnected")
+      logger.warn("Received a NodesChanged event when disconnected")
     }
 
   }
