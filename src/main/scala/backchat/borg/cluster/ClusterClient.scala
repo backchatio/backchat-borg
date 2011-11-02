@@ -7,6 +7,23 @@ import Actor._
 import java.util.concurrent.{ TimeUnit, CountDownLatch }
 
 /**
+ * ClusterClient companion object provides factory methods for creating a <code>ClusterClient</code> instance.
+ */
+object ClusterClient {
+  def apply(clientName: String, serviceName: String, zooKeeperConnectString: String, zooKeeperSessionTimeoutMillis: Int): ClusterClient = {
+    val cc = new ZooKeeperClusterClient(Some(clientName), serviceName, zooKeeperConnectString, zooKeeperSessionTimeoutMillis)
+    cc.start()
+    cc
+  }
+
+  def apply(serviceName: String, zooKeeperConnectString: String, zooKeeperSessionTimeoutMillis: Int): ClusterClient = {
+    val cc = new ZooKeeperClusterClient(None, serviceName, zooKeeperConnectString, zooKeeperSessionTimeoutMillis)
+    cc.start()
+    cc
+  }
+}
+
+/**
  *  The client interface for interacting with a cluster.
  */
 trait ClusterClient extends Logging {

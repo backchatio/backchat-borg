@@ -41,13 +41,13 @@ class ClusterNotificationManagerSpec extends Specification { def is =
 
     def clusterNotificationManager = null
 
-    def withEventListener(fn: (ActorRef, StandardLatch) => Result) = {
+    def withEventListener[T](fn: (ActorRef, StandardLatch) => T)(implicit evidence$1: (T) => Result) = {
       val act = actorOf(new ClusterNotificationManager).start()
       val res = fn(act, new StandardLatch)
       act ! Shutdown
       res
     }
-    def withEventListenerWithCallback(amount: Int)(fn: (ActorRef, CountDownLatch) => Result) = {
+    def withEventListenerWithCallback[T](amount: Int)(fn: (ActorRef, CountDownLatch) => T)(implicit evidence$1: (T) => Result) = {
       val callbackCounter = new CountDownLatch(3)
       val callback = actorOf(new Actor {
         protected def receive = {
@@ -61,7 +61,7 @@ class ClusterNotificationManagerSpec extends Specification { def is =
       res
     }
     def newListener(pf: Receive) = actorOf(new Actor { protected def receive = pf orElse { case _ => } }).start()
-    def withListener(pf: Receive)(fn: ActorRef => Result) = {
+    def withListener[T](pf: Receive)(fn: ActorRef => T)(implicit evidence$1: (T) => Result) = {
       val act = newListener(pf)
       val res = fn(act)
       act.stop()
