@@ -121,8 +121,8 @@ class ClusterEventListener(callback: Option[ActorRef]) extends Actor with Loggin
 
     notifyListeners(ClusterEvents.Shutdown)
     notifyListeners('quit)
-    currentNodes = Set()
 
+    currentNodes = Set()
     logger.debug("ClusterEventListener shut down")
     if (self.supervisor.isDefined) self.supervisor.foreach(_ ! UnlinkAndStop(self)) else self.stop()
   }

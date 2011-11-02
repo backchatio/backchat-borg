@@ -56,7 +56,7 @@ class ClusterEventListenerSpec extends Specification { def is =
       }).start()
       val act = actorOf(new ClusterEventListener(Some(callback))).start()
       val res = fn(act, callbackCounter)
-      act ! Shutdown
+      if(act.isRunning) act ! Shutdown
       res
     }
     def newListener(pf: Receive) = actorOf(new Actor { protected def receive = pf orElse { case _ => } }).start()
@@ -178,13 +178,53 @@ class ClusterEventListenerSpec extends Specification { def is =
       }
     }
 
-    def disconnectsCluster = pending
+    def disconnectsCluster = withEventListener { (eventListener, _) =>
+      eventListener ! Connected(nodes)
+      eventListener ! Disconnected
+      (eventListener ask Messages.GetCurrentNodes).as[Messages.CurrentNodes].get.nodes.size must_== 0
+    }
 
-    def notifyOnDisconnect = pending
+    def notifyOnDisconnect = withEventListenerWithCallback(3) { (eventListener, callbackCounter) =>
+      var calls = 0
+      withListener({
+        case Disconnected => calls += 1
+      }){ listener =>
+        eventListener ! Connected(nodes)
+        eventListener ! Messages.AddListener(listener)
+        eventListener ! Disconnected
+        callbackCounter.await(2, TimeUnit.SECONDS)
+        calls must_== 1
+      }
+    }
 
-    def dontNotifyOfDisconnectedIfDisconnected = pending
+    def dontNotifyOfDisconnectedIfDisconnected = withEventListenerWithCallback(2) { (eventListener, callbackCounter) =>
+      var calls = 0
+      withListener({
+        case Disconnected => calls += 1
+      }){ listener =>
+        eventListener ! Messages.AddListener(listener)
+        eventListener ! Disconnected
+        callbackCounter.await(2, TimeUnit.SECONDS)
+        calls must_== 0
+      }
+    }
 
-    def shutdownProperly = pending
+    def shutdownProperly = withEventListenerWithCallback(4) { (eventListener, callbackCounter) =>
+      var connectedCalls = 0
+      var disconnectedCalls = 0
+      withListener({
+        case Connected(_) => connectedCalls += 1
+        case Shutdown => disconnectedCalls += 1
+      }){ listener =>
+        eventListener ! Messages.AddListener(listener)
+        eventListener ! Connected(nodes)
+        eventListener ! Shutdown
+        eventListener ! Connected(nodes)
+        callbackCounter.await(2, TimeUnit.SECONDS)
+        println("Connected: %s, disconnected: %s".format(connectedCalls, disconnectedCalls))
+        (connectedCalls must eventually(be_==(1))) and (disconnectedCalls must eventually(be_==(1)))
+      }
+    }
 
   }
 }
