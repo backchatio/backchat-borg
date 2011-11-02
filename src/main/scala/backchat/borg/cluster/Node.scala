@@ -2,7 +2,7 @@ package backchat.borg
 package cluster
 
 import com.google.protobuf.InvalidProtocolBufferException
-import backchat.borg.protos.BorgProtos
+import protos.BorgProtos
 
 /**
  * The <code>Node</code> companion object. Provides factory methods and implicits.

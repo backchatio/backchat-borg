@@ -3,7 +3,7 @@ package cluster
 package tests
 
 import org.specs2.Specification
-import backchat.borg.protos.BorgProtos
+import protos.BorgProtos
 
 class NodeSpec extends Specification { def is =
 

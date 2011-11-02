@@ -98,6 +98,7 @@ object BackchatBorgSettings {
       autoCompilerPlugins := true,
       parallelExecution in Test := false,
       unmanagedResourceDirectories in Compile <+= (sourceDirectory in PB.protobufConfig).identity,
+      javaSource in PB.protobufConfig <<= (sourceManaged in Compile).identity,
       ivyXML := <dependencies>
           <exclude module="slf4j-log4j12" />
           <exclude module="log4j" />
