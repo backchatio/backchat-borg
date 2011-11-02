@@ -35,8 +35,8 @@ class ClusterNotificationManagerSpec extends Specification { def is =
     val nodes = shortNodes ++ List(Node(2, "localhost:31314", true, Set(3, 4)),
       Node(3, "localhost:31315", false, Set(5, 6)))
   }
-  class ListenerContext extends ClusterNotificationManager {
-    import Messages._
+  class ListenerContext extends ClusterNotificationManagerComponent {
+    import ClusterNotificationMessages._
     import ListenerContext._
 
     def clusterNotificationManager = null
@@ -79,7 +79,7 @@ class ClusterNotificationManagerSpec extends Specification { def is =
           latch.open()
         }
       }) { listener =>
-        eventListener ? Messages.AddListener(listener)
+        eventListener ? AddListener(listener)
         latch.tryAwait(2, TimeUnit.SECONDS)
         (calls must_== 1) and (current.size must_== 1) and (current.head.id must_== 2)
       }
@@ -93,7 +93,7 @@ class ClusterNotificationManagerSpec extends Specification { def is =
           latch.open()
         }
       }) { listener => 
-        eventListener ? Messages.AddListener(listener)
+        eventListener ? AddListener(listener)
         val res = latch.tryAwait(2, TimeUnit.SECONDS)
         res must beFalse and (calls must_== 0)
       }
@@ -103,9 +103,9 @@ class ClusterNotificationManagerSpec extends Specification { def is =
     def onRemoveListener = withEventListenerWithCallback(3) { (eventListener, callbackCounter) =>
       var calls = 0
       withListener({ case ClusterEvents.Connected(_) | ClusterEvents.NodesChanged(_) => calls += 1 }) { listener =>
-        val key = (eventListener ? Messages.AddListener(listener)).as[Messages.AddedListener].get.key
+        val key = (eventListener ? AddListener(listener)).as[AddedListener].get.key
         eventListener ! Connected(nodes)
-        eventListener ! Messages.RemoveListener(key)
+        eventListener ! RemoveListener(key)
         eventListener ! NodesChanged(nodes)
         callbackCounter.await(2, TimeUnit.SECONDS)
         calls must_== 1
@@ -122,7 +122,7 @@ class ClusterNotificationManagerSpec extends Specification { def is =
           latch.open()
         }
       }) { listener => 
-        eventListener ! Messages.AddListener(listener)
+        eventListener ! AddListener(listener)
         eventListener ! Connected(nodes)
         latch.tryAwait(2, TimeUnit.SECONDS)
         (calls must_== 1) and (current.size must_== 1) and (current.head.id must_== 2)
@@ -138,7 +138,7 @@ class ClusterNotificationManagerSpec extends Specification { def is =
           calls += 1
         }
       }){ listener =>
-        eventListener ! Messages.AddListener(listener)
+        eventListener ! AddListener(listener)
         eventListener ! Connected(nodes)
         eventListener ! Connected(nodes)
         callbackCounter.await(2, TimeUnit.SECONDS)
@@ -156,7 +156,7 @@ class ClusterNotificationManagerSpec extends Specification { def is =
         }
       }){ listener =>
         eventListener ! Connected(nodes)
-        eventListener ! Messages.AddListener(listener)
+        eventListener ! AddListener(listener)
         eventListener ! NodesChanged(nodes)
         callbackCounter.await(2, TimeUnit.SECONDS)
         (calls must_== 1) and (current.size must_== 1) and (current.head.id must_== 2)
@@ -173,7 +173,7 @@ class ClusterNotificationManagerSpec extends Specification { def is =
         }
       }) { listener =>
         eventListener ! Connected(nodes)
-        eventListener ! Messages.AddListener(listener)
+        eventListener ! AddListener(listener)
         eventListener ! NodesChanged(nodes)
         latch.tryAwait(2, TimeUnit.SECONDS) must beTrue and (calls must_== 1)
       }
@@ -182,7 +182,7 @@ class ClusterNotificationManagerSpec extends Specification { def is =
     def disconnectsCluster = withEventListener { (eventListener, _) =>
       eventListener ! Connected(nodes)
       eventListener ! Disconnected
-      (eventListener ask Messages.GetCurrentNodes).as[Messages.CurrentNodes].get.nodes.size must_== 0
+      (eventListener ask GetCurrentNodes).as[CurrentNodes].get.nodes.size must_== 0
     }
 
     def notifyOnDisconnect = withEventListenerWithCallback(3) { (eventListener, callbackCounter) =>
@@ -191,7 +191,7 @@ class ClusterNotificationManagerSpec extends Specification { def is =
         case ClusterEvents.Disconnected => calls += 1
       }){ listener =>
         eventListener ! Connected(nodes)
-        eventListener ! Messages.AddListener(listener)
+        eventListener ! AddListener(listener)
         eventListener ! Disconnected
         callbackCounter.await(2, TimeUnit.SECONDS)
         calls must_== 1
@@ -203,7 +203,7 @@ class ClusterNotificationManagerSpec extends Specification { def is =
       withListener({
         case ClusterEvents.Disconnected => calls += 1
       }){ listener =>
-        eventListener ! Messages.AddListener(listener)
+        eventListener ! AddListener(listener)
         eventListener ! Disconnected
         callbackCounter.await(2, TimeUnit.SECONDS)
         calls must_== 0
@@ -217,7 +217,7 @@ class ClusterNotificationManagerSpec extends Specification { def is =
         case ClusterEvents.Connected(_) => connectedCalls += 1
         case ClusterEvents.Shutdown => disconnectedCalls += 1
       }){ listener =>
-        eventListener ! Messages.AddListener(listener)
+        eventListener ! AddListener(listener)
         eventListener ! Connected(nodes)
         eventListener ! Shutdown
         eventListener ! Connected(nodes)

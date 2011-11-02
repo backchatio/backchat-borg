@@ -4,11 +4,11 @@ package cluster
 import akka.actor._
 import java.util.concurrent.atomic.AtomicLong
 
-trait ClusterNotificationManager {
+trait ClusterNotificationManagerComponent {
   def clusterNotificationManager: ActorRef
   sealed trait ClusterNotificationMessage
 
-  object Messages {
+  object ClusterNotificationMessages {
     case class AddListener(listener: ActorRef) extends ClusterNotificationMessage
     case class AddedListener(key: ClusterListenerKey) extends ClusterNotificationMessage
     case class RemoveListener(key: ClusterListenerKey) extends ClusterNotificationMessage
@@ -23,7 +23,7 @@ trait ClusterNotificationManager {
   class ClusterNotificationManager(callback: Option[ActorRef]) extends Actor with Logging {
     def this() = this(None)
 
-    import Messages._
+    import ClusterNotificationMessages._
 
     private var currentNodes = Set.empty[Node]
     private val listenerId = new AtomicLong(0)
