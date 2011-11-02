@@ -6,13 +6,12 @@ import org.specs2._
 import execute.Result
 import akka.actor._
 import Actor._
-import cluster.ClusterEvents._
 import java.util.concurrent.{CountDownLatch, TimeUnit}
 import org.multiverse.api.latches.StandardLatch
 
-class ClusterEventListenerSpec extends Specification { def is =
+class ClusterNotificationManagerSpec extends Specification { def is =
 
-  "A ClusterEventListener should" ^
+  "A ClusterNotificationManager should" ^
     "when handling an AddListener message" ^
       "send a connected event to the listener if the cluster is connected" ! context.sendConnectedEvent ^
       "not send a connected event to the listener if the cluster is not connected" ! context.dontSendConnectedOnDisconnected ^ br^
@@ -36,12 +35,14 @@ class ClusterEventListenerSpec extends Specification { def is =
     val nodes = shortNodes ++ List(Node(2, "localhost:31314", true, Set(3, 4)),
       Node(3, "localhost:31315", false, Set(5, 6)))
   }
-  class ListenerContext {
-    import ClusterEventListener._
+  class ListenerContext extends ClusterNotificationManager {
+    import Messages._
     import ListenerContext._
 
+    def clusterNotificationManager = null
+
     def withEventListener(fn: (ActorRef, StandardLatch) => Result) = {
-      val act = actorOf(new ClusterEventListener).start()
+      val act = actorOf(new ClusterNotificationManager).start()
       val res = fn(act, new StandardLatch)
       act ! Shutdown
       res
@@ -54,7 +55,7 @@ class ClusterEventListenerSpec extends Specification { def is =
           case _ => callbackCounter.countDown()
         }
       }).start()
-      val act = actorOf(new ClusterEventListener(Some(callback))).start()
+      val act = actorOf(new ClusterNotificationManager(Some(callback))).start()
       val res = fn(act, callbackCounter)
       if(act.isRunning) act ! Shutdown
       res
@@ -72,7 +73,7 @@ class ClusterEventListenerSpec extends Specification { def is =
       var calls = 0
       var current = Set.empty[Node]
       withListener({
-        case Connected(n) => {
+        case ClusterEvents.Connected(n) => {
           current = n
           calls += 1
           latch.open()
@@ -87,7 +88,7 @@ class ClusterEventListenerSpec extends Specification { def is =
     def dontSendConnectedOnDisconnected = withEventListener { (eventListener, latch) =>
       var calls = 0
       withListener({
-        case Connected(_) => {
+        case ClusterEvents.Connected(_) => {
           calls += 1
           latch.open()
         }
@@ -101,7 +102,7 @@ class ClusterEventListenerSpec extends Specification { def is =
 
     def onRemoveListener = withEventListenerWithCallback(3) { (eventListener, callbackCounter) =>
       var calls = 0
-      withListener({ case Connected(_) | NodesChanged(_) => calls += 1 }) { listener => 
+      withListener({ case ClusterEvents.Connected(_) | ClusterEvents.NodesChanged(_) => calls += 1 }) { listener =>
         val key = (eventListener ? Messages.AddListener(listener)).as[Messages.AddedListener].get.key
         eventListener ! Connected(nodes)
         eventListener ! Messages.RemoveListener(key)
@@ -132,7 +133,7 @@ class ClusterEventListenerSpec extends Specification { def is =
       var calls = 0
       var current = Set.empty[Node]
       withListener({
-        case Connected(n) => {
+        case ClusterEvents.Connected(n) => {
           current = n
           calls += 1
         }
@@ -149,7 +150,7 @@ class ClusterEventListenerSpec extends Specification { def is =
       var calls = 0
       var current = Set.empty[Node]
       withListener({
-        case NodesChanged(n) => {
+        case ClusterEvents.NodesChanged(n) => {
           calls += 1 
           current = n
         }
@@ -165,8 +166,8 @@ class ClusterEventListenerSpec extends Specification { def is =
     def dontNotifyOfChangesIfDisconnected = withEventListener { (eventListener, latch) =>
       var calls = 0
       withListener({
-        case Connected => calls += 1
-        case NodesChanged(_) => {
+        case ClusterEvents.Connected => calls += 1
+        case ClusterEvents.NodesChanged(_) => {
           calls += 1
           latch.open()
         }
@@ -187,7 +188,7 @@ class ClusterEventListenerSpec extends Specification { def is =
     def notifyOnDisconnect = withEventListenerWithCallback(3) { (eventListener, callbackCounter) =>
       var calls = 0
       withListener({
-        case Disconnected => calls += 1
+        case ClusterEvents.Disconnected => calls += 1
       }){ listener =>
         eventListener ! Connected(nodes)
         eventListener ! Messages.AddListener(listener)
@@ -200,7 +201,7 @@ class ClusterEventListenerSpec extends Specification { def is =
     def dontNotifyOfDisconnectedIfDisconnected = withEventListenerWithCallback(2) { (eventListener, callbackCounter) =>
       var calls = 0
       withListener({
-        case Disconnected => calls += 1
+        case ClusterEvents.Disconnected => calls += 1
       }){ listener =>
         eventListener ! Messages.AddListener(listener)
         eventListener ! Disconnected
@@ -213,8 +214,8 @@ class ClusterEventListenerSpec extends Specification { def is =
       var connectedCalls = 0
       var disconnectedCalls = 0
       withListener({
-        case Connected(_) => connectedCalls += 1
-        case Shutdown => disconnectedCalls += 1
+        case ClusterEvents.Connected(_) => connectedCalls += 1
+        case ClusterEvents.Shutdown => disconnectedCalls += 1
       }){ listener =>
         eventListener ! Messages.AddListener(listener)
         eventListener ! Connected(nodes)
