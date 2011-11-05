@@ -70,12 +70,11 @@ object BackchatBorgSettings {
         "-encoding", "utf8",
         "-P:continuations:enable"),
       resolvers ++= Seq(
-        "Mojolly Default" at "http://maven.mojolly.com/content/groups/default-repos/",
-        "GlassFish Repo" at "http://download.java.net/maven/glassfish/",
-        "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
-        "TypeSafe releases" at "http://repo.typesafe.com/typesafe/releases/",
-        "Boundary Public Repo" at "http://maven.boundary.com/artifactory/repo",
-        "Akka Repo" at "http://akka.io/repository"
+        "Mojolly Default" at "https://artifactory.backchat.io/default-repos/",
+        "GlassFish Repo" at "https://artifactory.backchat.io/glassfish-repo/",
+        "Sonatype Snapshots" at "https://artifactory.backchat.io/sonatype-oss-snapshots/",
+        "TypeSafe releases" at "https://artifactory.backchat.io/typesafe-releases/",
+        "Akka Repo" at "https://artifactory.backchat.io/akka-repo/"
       ),
       //retrieveManaged := true,
       (excludeFilter in formatSources) <<= (excludeFilter) (_ || "*Spec.scala"),
@@ -85,12 +84,13 @@ object BackchatBorgSettings {
         "commons-codec" % "commons-codec" % "1.5",
         "net.liftweb" %% "lift-json-ext" % "2.4-M4",
         "org.slf4j" % "log4j-over-slf4j" % "1.6.1",
-        "org.apache.zookeeper" % "zookeeper" % "3.3.3",
+        "org.apache.hadoop.zookeeper" % "zookeeper" % "3.4.0",
         "se.scalablesolutions.akka" % "akka-stm" % "1.2",
         "com.mojolly.logback" %% "logback-akka" % "0.7.4-SNAPSHOT",
         "org.specs2" %% "specs2" % "1.6.1" % "test",
         "org.scalatest" %% "scalatest" % "1.6.1" % "test",
-        "se.scalablesolutions.akka" % "akka-testkit" % "1.2" % "test"
+        "se.scalablesolutions.akka" % "akka-testkit" % "1.2" % "test",
+        "org.mockito" % "mockito-all" % "1.8.5" % "test"
       ),
       compileOrder := CompileOrder.JavaThenScala,
       libraryDependencies ++= compilerPlugins,
@@ -126,9 +126,6 @@ object BackchatBorgSettings {
           "Implementation-Vendor" -> "Mojolly Ltd.",
           "Implementation-Url" -> "https://backchat.io"
          )
-    },
-    pomExtra <<= (pomExtra, name, description) { (extra, title, desc) => extra ++ Seq(
-      <name>{title}</name>, <description>{desc}</description>)
     })
  
   val projectSettings = buildSettings ++ packageSettings

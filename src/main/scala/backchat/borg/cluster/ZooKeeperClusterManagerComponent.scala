@@ -16,7 +16,7 @@ trait ZooKeeperClusterManagerComponent extends ClusterManagerComponent {
     case class NodeChildrenChanged(path: String) extends ZooKeeperMessage
   }
 
-  class ZooKeeperClusterManager(connectString: String, sessionTimeout: Int, serviceName: String)(implicit zooKeeperFactory: (String, Int, Watcher) ⇒ ZooKeeper) extends Actor with ClusterManagerHelper with Logging {
+  class ZooKeeperClusterManager(connectString: String, sessionTimeout: Duration, serviceName: String)(implicit zooKeeperFactory: (String, Duration, Watcher) ⇒ ZooKeeper) extends Actor with ClusterManagerHelper with Logging {
     private val SERVICE_NODE = "/" + serviceName
     private val AVAILABILITY_NODE = SERVICE_NODE + "/available"
     private val MEMBERSHIP_NODE = SERVICE_NODE + "/members"
@@ -325,7 +325,8 @@ trait ZooKeeperClusterManagerComponent extends ClusterManagerComponent {
     }
   }
 
-  protected implicit def defaultZooKeeperFactory(connectString: String, sessionTimeout: Int, watcher: Watcher) = new ZooKeeper(connectString, sessionTimeout, watcher)
+  protected implicit def defaultZooKeeperFactory(connectString: String, sessionTimeout: Duration, watcher: Watcher) =
+    new ZooKeeper(connectString, sessionTimeout.getMillis.toInt, watcher)
 
   class ClusterWatcher(zooKeeperManager: ActorRef) extends Watcher {
     @volatile
