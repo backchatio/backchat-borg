@@ -71,6 +71,7 @@ object BackchatBorgSettings {
         "-P:continuations:enable"),
       resolvers ++= Seq(
         "Mojolly Default" at "https://artifactory.backchat.io/default-repos/",
+        Resolver.url("Mojolly ivy repository", url("https://artifactory.backchat.io/libs-local"))(Resolver.defaultIvyPatterns),
         "GlassFish Repo" at "https://artifactory.backchat.io/glassfish-repo/",
         "Sonatype Snapshots" at "https://artifactory.backchat.io/sonatype-oss-snapshots/",
         "TypeSafe releases" at "https://artifactory.backchat.io/typesafe-releases/",
@@ -78,9 +79,10 @@ object BackchatBorgSettings {
       ),
       //retrieveManaged := true,
       (excludeFilter in formatSources) <<= (excludeFilter) (_ || "*Spec.scala"),
+      publishMavenStyle := false,
       libraryDependencies ++= Seq(
         "com.google.protobuf" % "protobuf-java" % "2.4.1",
-        "com.mojolly.library" %% "library-core" % "0.9.7-SNAPSHOT",
+        "com.mojolly.library" %% "library-core" % "0.9.9-SNAPSHOT",
         "commons-codec" % "commons-codec" % "1.5",
         "net.liftweb" %% "lift-json-ext" % "2.4-M4",
         "org.slf4j" % "log4j-over-slf4j" % "1.6.1",
@@ -102,11 +104,7 @@ object BackchatBorgSettings {
           <exclude module="slf4j-log4j12" />
           <exclude module="log4j" />
         </dependencies>,
-      publishTo <<= (version) { vers: String => 
-        val nexus = "http://maven.mojolly.com/content/repositories/"
-        if (vers.trim.endsWith("SNAPSHOT")) Some("snapshots" at nexus+"snapshots/")
-        else                                Some("releases" at nexus+"releases/")
-      },
+      publishTo := Some(Resolver.url("Mojolly ivy repository", url("https://artifactory.backchat.io/libs-local"))(Resolver.defaultIvyPatterns)),
       mainClass := Some("backchat.borg.samples.ClientTestServer"),
       shellPrompt  := ShellPrompt.buildShellPrompt)
 
