@@ -87,11 +87,11 @@ object BackchatBorgSettings {
         "net.liftweb" %% "lift-json-ext" % "2.4-M4",
         "org.slf4j" % "log4j-over-slf4j" % "1.6.1",
         "org.apache.hadoop.zookeeper" % "zookeeper" % "3.4.0",
-        "se.scalablesolutions.akka" % "akka-stm" % "1.2",
+        "se.scalablesolutions.akka" % "akka-stm" % "1.2.9",
         "com.mojolly.logback" %% "logback-akka" % "0.7.4-SNAPSHOT",
         "org.specs2" %% "specs2" % "1.6.1" % "test",
         "org.scalatest" %% "scalatest" % "1.6.1" % "test",
-        "se.scalablesolutions.akka" % "akka-testkit" % "1.2" % "test",
+        "se.scalablesolutions.akka" % "akka-testkit" % "1.2.9" % "test",
         "org.mockito" % "mockito-all" % "1.8.5" % "test"
       ),
       compileOrder := CompileOrder.JavaThenScala,
