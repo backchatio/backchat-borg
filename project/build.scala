@@ -9,10 +9,12 @@ object BackchatBorgBuild extends Build {
 
   val buildOrganization = "com.mojolly.borg"
   val buildVersion      = "0.0.4-SNAPSHOT"
+  
+  val commonSettings = buildSettings ++ Seq(version := buildVersion, organization := buildOrganization)
+  val typesafeReleases = "TypeSafe releases" at "https://artifactory.backchat.io/typesafe-releases/"
 
-  lazy val root = Project ("backchat-borg", file("."), settings = buildSettings ++ PB.protobufSettings ++ Seq(
-      version := buildVersion,
-      organization := buildOrganization,
+  lazy val root = Project ("backchat-borg", file("."), settings = commonSettings ++ PB.protobufSettings ++ Seq(
+      moduleConfigurations += ModuleConfiguration("org.apache.hadoop.zookeeper", typesafeReleases),
       libraryDependencies ++= Seq(
         "com.google.protobuf" % "protobuf-java" % "2.4.1",
         mojollyLibrary("core"), commons("codec", "1.5"), commons("io", "2.1"),
