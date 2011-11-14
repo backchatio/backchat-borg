@@ -14,21 +14,21 @@ class ZookeeperClientSpec extends Specification {
   
   def is = 
     "A ZooKeeperClient should" ^
-      "be able to be instantiated with a FakeWatcher" ! context.instantiatesWithFake ^
-      "connect to a local ZooKeeper server and retrieve the version" ! context.retrievesVersion ^
-      "get data at a known-good specified path" ! context.getsDataFromKnownGood ^ 
-      "get data at a known-bad specified path" ! context.throwsForGetDataFromKnownBad ^ 
-      "get a list of children" ! context.getsChildren ^
-      "create a node at a specified path"  ! context.createsNodeAtPath ^
-      "watch a node" ! context.watchesNode ^
-      "watch a tree of nodes" ! context.watchesTreeOfNodes ^
-      "watch a tree of nodes with data" ! context.watchesTreeOfNodesWithData ^
+      "be able to be instantiated with a FakeWatcher" ! specify.instantiatesWithFake ^
+      "connect to a local ZooKeeper server and retrieve the version" ! specify.retrievesVersion ^
+      "get data at a known-good specified path" ! specify.getsDataFromKnownGood ^
+      "get data at a known-bad specified path" ! specify.throwsForGetDataFromKnownBad ^
+      "get a list of children" ! specify.getsChildren ^
+      "create a node at a specified path"  ! specify.createsNodeAtPath ^
+      "watch a node" ! specify.watchesNode ^
+      "watch a tree of nodes" ! specify.watchesTreeOfNodes ^
+      "watch a tree of nodes with data" ! specify.watchesTreeOfNodesWithData ^
       end
   
   val zookeeperServer = new ZooKeeperTestServer()
   override def map(fs: => Fragments) = Step(zookeeperServer.start()) ^ super.map(fs) ^ Step(zookeeperServer.stop())
 
-  def context = ZookeeperSpecContext(zookeeperServer.port)
+  def specify = ZookeeperSpecContext(zookeeperServer.port)
 
   case class ZookeeperSpecContext(port: Int) extends After {
     val config = new ZookeeperClientConfig {
