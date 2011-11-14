@@ -2,13 +2,31 @@ package backchat.borg
 package hive
 package tests
 
-import org.specs2.Specification
 import akka.actor._
 import Actor._
 import java.util.concurrent.TimeUnit
 import org.multiverse.api.latches.StandardLatch
+import mojolly.testing.AkkaSpecification
+import akka.testkit.Testing._
+import akka.util.{ Duration => AkkaDuration }
+import AkkaDuration.timeFactor
 
-class ClusterClientSpec extends Specification { def is =
+/**
+ * Multiplying numbers used in test timeouts by a factor, set by system property.
+ * Useful for Jenkins builds (where the machine may need more time).
+ */
+trait TimeHelpers {
+  def testTime(t: Int): Int = (timeFactor * t).toInt
+  def testTime(t: Long): Long = (timeFactor * t).toLong
+  def testTime(t: Float): Float = (timeFactor * t).toFloat
+  def testTime(t: Double): Double = timeFactor * t
+
+  object sleep {
+    def ->(duration:Duration) = Thread.sleep(testTime(duration.millis))
+  }
+}
+
+class ClusterClientSpec extends AkkaSpecification with TimeHelpers { def is =
 
   "A ClusterClient should" ^
     "when starting the cluster notification and zookeeper manager actors" ! context.startsSuccessfully ^
@@ -122,7 +140,7 @@ class ClusterClientSpec extends Specification { def is =
 
     def addsNode = {
       clusterActor ! ClusterEvents.Connected(Set())
-      Thread.sleep(10)
+      sleep -> 10.millis
 
       (cluster.addNode(1, "localhost:31313", Set(1, 2)) must not beNull) and
       (addNodeCount must be_==(1)) and
@@ -133,7 +151,7 @@ class ClusterClientSpec extends Specification { def is =
     
     def removesNode = {
       clusterActor ! ClusterEvents.Connected(Set())
-      Thread.sleep(10)
+      sleep -> 10.millis
 
       cluster.removeNode(1)
       removeNodeCount must be_==(1) and (nodeRemovedId must be_==(1))
@@ -141,7 +159,7 @@ class ClusterClientSpec extends Specification { def is =
 
     def marksAvailable = {
       clusterActor ! ClusterEvents.Connected(Set())
-      Thread.sleep(10)
+      sleep -> 10.millis
 
       cluster.markNodeAvailable(11)
       markNodeAvailableCount must be_==(1) and (markNodeAvailableId must be_==(11))
@@ -150,7 +168,7 @@ class ClusterClientSpec extends Specification { def is =
 
     def marksUnvailable = {
       clusterActor ! ClusterEvents.Connected(Set())
-      Thread.sleep(10)
+      sleep -> 10.millis
 
       cluster.markNodeUnavailable(111)
       markNodeUnavailableCount must be_==(1) and (markNodeUnavailableId must be_==(111))
@@ -158,7 +176,7 @@ class ClusterClientSpec extends Specification { def is =
 
     def asksForCurrentNodes = {
       clusterActor ! ClusterEvents.Connected(Set())
-      Thread.sleep(10)
+      sleep -> 10.millis
 
       val nodes = cluster.nodes
       nodes.size must be_==(3) and
@@ -168,13 +186,13 @@ class ClusterClientSpec extends Specification { def is =
 
     def returnsNodeMatchingId = {
       clusterActor ! ClusterEvents.Connected(currentNodes)
-      Thread.sleep(10L)
+      sleep -> 10.millis
       cluster.nodeWithId(2) must beSome[Node].which(currentNodes must contain(_))
     }
 
     def returnsNoneIfNoNodeMatches = {
       clusterActor ! ClusterEvents.Connected(currentNodes)
-      Thread.sleep(10L)
+      sleep -> 10.millis
       cluster.nodeWithId(4) must beNone
     }
 
