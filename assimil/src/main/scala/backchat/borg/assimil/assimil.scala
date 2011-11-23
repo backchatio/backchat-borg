@@ -1,6 +1,7 @@
 package backchat.borg
 
 import org.zeromq.{ ZMQ ⇒ JZMQ }
+import akka.actor.Uuid
 
 package object assimil  {
 
@@ -19,4 +20,5 @@ package object assimil  {
   val SendMore = JZMQ.SNDMORE
   val NoBlock = JZMQ.NOBLOCK
 
+  def newCcId = new Uuid().toString
 }

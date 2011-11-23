@@ -11,8 +11,8 @@ import org.apache.zookeeper.Watcher.Event.EventType
 import org.apache.zookeeper.Watcher.Event.KeeperState
 import java.util.concurrent.CountDownLatch
 
-class ZookeeperClient(servers: String, sessionTimeout: Int, basePath: String,
-                      watcher: Option[ZookeeperClient ⇒ Unit]) extends Logging {
+class ZooKeeperClient(servers: String, sessionTimeout: Int, basePath: String,
+                      watcher: Option[ZooKeeperClient ⇒ Unit]) extends Logging {
 
   @volatile
   private var zk: ZooKeeper = null
@@ -21,23 +21,23 @@ class ZookeeperClient(servers: String, sessionTimeout: Int, basePath: String,
   def this(servers: String, sessionTimeout: Int, basePath: String) =
     this(servers, sessionTimeout, basePath, None)
 
-  def this(servers: String, sessionTimeout: Int, basePath: String, watcher: ZookeeperClient ⇒ Unit) =
+  def this(servers: String, sessionTimeout: Int, basePath: String, watcher: ZooKeeperClient ⇒ Unit) =
     this(servers, sessionTimeout, basePath, Some(watcher))
 
   def this(servers: String) =
     this(servers, 3000, "", None)
 
-  def this(servers: String, watcher: ZookeeperClient ⇒ Unit) =
+  def this(servers: String, watcher: ZooKeeperClient ⇒ Unit) =
     this(servers, 3000, "", Some(watcher))
 
-  def this(config: ZookeeperClientConfig, watcher: Option[ZookeeperClient ⇒ Unit]) = {
+  def this(config: ZooKeeperClientConfig, watcher: Option[ZooKeeperClient ⇒ Unit]) = {
     this(config.hostList,
       config.sessionTimeout,
       config.basePath,
       watcher)
   }
 
-  def this(config: ZookeeperClientConfig) = {
+  def this(config: ZooKeeperClientConfig) = {
     this(config, None)
   }
 

@@ -1,5 +1,5 @@
 package com.twitter.zookeeper
 
-class TestConfig extends ZookeeperClientConfig {
+class TestConfig extends ZooKeeperClientConfig {
   val hostList = "localhost:2181"
 }

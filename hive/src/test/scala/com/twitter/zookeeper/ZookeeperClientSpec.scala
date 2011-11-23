@@ -1,16 +1,14 @@
 package com.twitter.zookeeper
 
-import org.apache.zookeeper.{CreateMode, Watcher, WatchedEvent, ZooKeeper}
+import org.apache.zookeeper.CreateMode
 import org.apache.zookeeper.CreateMode._
 import org.apache.zookeeper.KeeperException.NoNodeException
-import org.apache.zookeeper.data.{ACL, Id}
+import org.apache.zookeeper.data.Id
 import scala.collection.mutable
-import org.specs2.Specification
-import backchat.borg.hive.testing.ZooKeeperTestServer
-import org.specs2.specification.{After, Step, Fragments}
-import org.specs2.execute.Result
+import backchat.borg.hive.{ZooKeeperClientContext, ZooKeeperSpecification}
 
-class ZookeeperClientSpec extends Specification {
+
+class ZooKeeperClientSpec extends ZooKeeperSpecification {
   
   def is = 
     "A ZooKeeperClient should" ^
@@ -24,24 +22,12 @@ class ZookeeperClientSpec extends Specification {
       "watch a tree of nodes" ! specify.watchesTreeOfNodes ^
       "watch a tree of nodes with data" ! specify.watchesTreeOfNodesWithData ^
       end
-  
-  val zookeeperServer = new ZooKeeperTestServer()
-  override def map(fs: => Fragments) = Step(zookeeperServer.start()) ^ super.map(fs) ^ Step(zookeeperServer.stop())
 
-  def specify = ZookeeperSpecContext(zookeeperServer.port)
 
-  case class ZookeeperSpecContext(port: Int) extends After {
-    val config = new ZookeeperClientConfig {
-      def hostList = "localhost:%s" format port
-    }
-    val hostlist = config.hostList
-    
-    val zkClient = new ZookeeperClient(config)
+  def specify = ZooKeeperSpecContext(zookeeperServer.port)
 
-    def after = {
-      zkClient.close()
-    }
-    
+  case class ZooKeeperSpecContext(port: Int) extends ZooKeeperClientContext(port) {
+
     def instantiatesWithFake = this { zkClient must not beNull }
     
     def retrievesVersion = this { zkClient.isAlive must beTrue }

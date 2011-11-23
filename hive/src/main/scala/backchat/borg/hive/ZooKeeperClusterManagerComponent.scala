@@ -4,6 +4,7 @@ package hive
 import akka.actor._
 import java.io.IOException
 import org.apache.zookeeper._
+import akka.util.Switch
 
 trait ZooKeeperClusterManagerComponent extends ClusterManagerComponent {
   this: ClusterNotificationManagerComponent ⇒
@@ -20,6 +21,8 @@ trait ZooKeeperClusterManagerComponent extends ClusterManagerComponent {
     private val SERVICE_NODE = "/" + serviceName
     private val AVAILABILITY_NODE = SERVICE_NODE + "/available"
     private val MEMBERSHIP_NODE = SERVICE_NODE + "/members"
+
+    private val NODES = List(SERVICE_NODE, AVAILABILITY_NODE, MEMBERSHIP_NODE)
 
     private val currentNodes = scala.collection.mutable.Map[Int, Node]()
     private var zooKeeper: Option[ZooKeeper] = None
@@ -143,7 +146,8 @@ trait ZooKeeperClusterManagerComponent extends ClusterManagerComponent {
 
             None
           } catch {
-            case ex: KeeperException if ex.code == KeeperException.Code.NODEEXISTS ⇒ Some(new InvalidNodeException("A node with id %d already exists".format(node.id)))
+            case ex: KeeperException if ex.code() == KeeperException.Code.NODEEXISTS ⇒
+              Some(new InvalidNodeException("A node with id %d already exists".format(node.id)))
           }
         }
       }
@@ -179,7 +183,7 @@ trait ZooKeeperClusterManagerComponent extends ClusterManagerComponent {
           try {
             zk.create(path, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL)
           } catch {
-            case ex: KeeperException if ex.code == KeeperException.Code.NODEEXISTS ⇒ // do nothing
+            case ex: KeeperException if ex.code() == KeeperException.Code.NODEEXISTS ⇒ // do nothing
           }
         }
 
@@ -200,7 +204,7 @@ trait ZooKeeperClusterManagerComponent extends ClusterManagerComponent {
             zk.delete(path, -1)
             None
           } catch {
-            case ex: KeeperException if ex.code == KeeperException.Code.NONODE ⇒ // do nothing
+            case ex: KeeperException if ex.code() == KeeperException.Code.NONODE ⇒ // do nothing
           }
         }
 
@@ -231,10 +235,10 @@ trait ZooKeeperClusterManagerComponent extends ClusterManagerComponent {
         logger.debug("Connected to ZooKeeper")
         zk
       } catch {
-        case ex: IOException ⇒
+        case ex: IOException ⇒ {
           logger.error("Unable to connect to ZooKeeper", ex)
           None
-
+        }
         case ex: Exception ⇒
           logger.error("Exception while connecting to ZooKeeper", ex)
           None
@@ -244,15 +248,15 @@ trait ZooKeeperClusterManagerComponent extends ClusterManagerComponent {
     private def verifyZooKeeperStructure(zk: ZooKeeper) {
       logger.debug("Verifying ZooKeeper structure...")
 
-      List(SERVICE_NODE, AVAILABILITY_NODE, MEMBERSHIP_NODE).foreach { path ⇒
+      NODES foreach { path ⇒
         try {
           logger.debug("Ensuring %s exists".format(path))
-          if (zk.exists(path, false) == null) {
+          if (zk.exists(path, false).isNull) {
             logger.debug("%s doesn't exist, creating".format(path))
             zk.create(path, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT)
           }
         } catch {
-          case ex: KeeperException if ex.code == KeeperException.Code.NODEEXISTS ⇒ // do nothing
+          case ex: KeeperException if ex.code() == KeeperException.Code.NODEEXISTS ⇒ // do nothing
         }
       }
     }
@@ -329,27 +333,25 @@ trait ZooKeeperClusterManagerComponent extends ClusterManagerComponent {
     new ZooKeeper(connectString, sessionTimeout.getMillis.toInt, watcher)
 
   class ClusterWatcher(zooKeeperManager: ActorRef) extends Watcher {
-    @volatile
-    private var shutdownSwitch = false
+    private val switch = new Switch(true)
 
     def process(event: WatchedEvent) {
       import org.apache.zookeeper.Watcher.Event.{ EventType, KeeperState }
       import ZooKeeperMessages._
+      switch ifOn {
+        event.getType match {
+          case EventType.None ⇒
+            event.getState match {
+              case KeeperState.SyncConnected ⇒ zooKeeperManager ! Connected
+              case KeeperState.Disconnected  ⇒ zooKeeperManager ! Disconnected
+              case KeeperState.Expired       ⇒ zooKeeperManager ! Expired
+            }
 
-      if (shutdownSwitch) return
-
-      event.getType match {
-        case EventType.None ⇒
-          event.getState match {
-            case KeeperState.SyncConnected ⇒ zooKeeperManager ! Connected
-            case KeeperState.Disconnected  ⇒ zooKeeperManager ! Disconnected
-            case KeeperState.Expired       ⇒ zooKeeperManager ! Expired
-          }
-
-        case EventType.NodeChildrenChanged ⇒ zooKeeperManager ! NodeChildrenChanged(event.getPath)
+          case EventType.NodeChildrenChanged ⇒ zooKeeperManager ! NodeChildrenChanged(event.getPath)
+        }
       }
     }
 
-    def shutdown(): Unit = shutdownSwitch = true
+    def shutdown(): Unit = switch.switchOff
   }
 }

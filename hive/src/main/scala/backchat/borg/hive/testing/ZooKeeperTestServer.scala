@@ -64,12 +64,12 @@ class ZooKeeperTestServer(sessionTimeout: Period = 100.millis, maxRetries: Int =
 
   //  def newClient(sessionTimeout: Duration = 3.seconds) = {
   //    require(started, "The server needs to be started to spawn clients")
-  //    val cl = new ZookeeperClient("127.0.0.1:%s".format(port))
+  //    val cl = new ZooKeeperClient("127.0.0.1:%s".format(port))
   //    shutDownActions += { () ⇒ cl.close() }
   //    cl
   //  }
   //
-  //  def expireClientSession(client: ZookeeperClient) {
+  //  def expireClientSession(client: ZooKeeperClient) {
   //    zookeeperServer.closeSession(client.getHandle.getSessionId)
   //  }
 }
