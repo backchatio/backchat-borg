@@ -1,88 +1,92 @@
-package backchat.borg.cadence
+package backchat
+package borg
+package cadence
 
-import com.weiglewilczek.slf4s.Logger
 import com.ning.http.client.AsyncHttpClient
-import java.util.concurrent.{TimeUnit, Executors, ScheduledExecutorService}
+import java.util.concurrent.TimeUnit
 import net.liftweb.json._
 import mojolly._
 import metrics.MetricsConfig
+import akka.actor.Scheduler
+import akka.util.Bootable
+import Alerter._
 
 /**
- * Application for alerting.
+ * Polls Graphite and logs.
+ *
+ * TODO SDB:
+ * - cleanup config + catch exceptions
  */
-object Alerter extends App {
-  lazy val loggerName = "ALERT"
-  lazy val logger = Logger(loggerName)
+class Alerter(config: AlerterConfig) extends Bootable {
+  lazy val httpClient = new AsyncHttpClient
 
-  val poller = new GraphitePoller(new AlerterConfig) start()
-  sys.addShutdownHook { poller.shutdown }
+  override def onLoad() {
+    super.onLoad()
+    Scheduler schedule(() => run, 0, config.period, TimeUnit.SECONDS)
+  }
 
-  class GraphitePoller(config: AlerterConfig) extends Runnable {
-    lazy val executor: ScheduledExecutorService = Executors newSingleThreadScheduledExecutor()
-    lazy val httpClient = new AsyncHttpClient
+  override def onUnload() {
+    super.onUnload()
+    httpClient.close()
+  }
 
-    def start() = {
-      executor scheduleAtFixedRate(this, 0, config.period, TimeUnit.SECONDS)
-      this
+  def requestUrl = "%s/render?format=json&from=-%ds" format (config.url, config.period)
+
+  def run {
+    val req = (httpClient prepareGet requestUrl)
+    config.alerts foreach { a =>
+      req addQueryParameter("target", a.target)
     }
+    val resp = req execute() get()
+    val json = resp.getResponseBody
+    GraphiteResponse(json) foreach handle
+  }
 
-    def shutdown() = {
-      executor shutdown()
-      httpClient.close()
-    }
-
-    def requestUrl = "%s/render?format=json&from=-%ds" format (config.url, config.period)
-
-    def run {
-      val req = (httpClient prepareGet requestUrl)
-      config.alerts.get foreach { a =>
-        req addQueryParameter("target", a.target)
-      }
-      val resp = req execute() get()
-      val json = resp.getResponseBody
-      val gr = GraphiteResponse(json)
+  def handle(resp:  GraphiteResponse) = resp.metrics foreach { m =>
+    config.alerts find (_.target == m.target) foreach { a =>
+      val sum = (m.datapoints map (_.value)).sum
+      println(a.target + ": " + sum)
     }
   }
-  
+}
+
+object Alerter {
   class AlerterConfig(key: String = "application") extends Configuration(ConfigurationContext(key)) with MetricsConfig {
-    val applicationName = "Alerter"
-    val alerts = {
-      config.getSection("mojolly.borg.cadence.alerts") map { section =>
-        section.keys.map(_.split("\\.")).map(_.head) map { k =>
-          Alert(
-            target = section.getString(k + ".graphitekeypattern").get,
-            warn = section.getInt(k + ".error").get,
-            error = section.getInt(k + ".warn").get
-          )
+      val applicationName = "Alerter"
+      val alerts = {
+        config.getSection("mojolly.borg.cadence.alerts") map { section =>
+          section.keys.map(_.split("\\.", 2)).map(_.head) map { k =>
+            Alert(
+              target = section.getString(k + ".graphitekeypattern").get,
+              warn = section.getInt(k + ".error").get,
+              error = section.getInt(k + ".warn").get
+            )
+          }
+        }
+      } get
+      val url = reporting map (r => "http://%s" format r.host) getOrElse "http://graphite"
+      val period = config.getSection("mojolly.reporting") flatMap { sect ⇒
+        sect.getInt("pollInterval")
+      } getOrElse 60
+    }
+
+    case class Alert(target: String,  warn: Int, error: Int)
+
+    case class GraphiteResponse(metrics: List[Metric])
+    case class Metric(target: String, datapoints: List[Datapoint])
+    case class Datapoint(timestamp: Long, value: Double)
+
+    object GraphiteResponse {
+      def apply(jsonString: String): Option[GraphiteResponse] = {
+        parse(jsonString) match {
+          case JArray(metric) => Some(GraphiteResponse(metric collect {
+            case JObject(JField("target", JString(target)) :: JField("datapoints", JArray(datapoints)) :: Nil) =>
+              Metric(target, datapoints collect {
+                case JArray(List(JDouble(v), JInt(timestamp))) => Datapoint(timestamp.toLong, v)
+              })
+            }))
+          case _ => None
         }
       }
     }
-    val url = reporting map (r => "http://%s" format r.host) getOrElse "http://graphite"
-    val period = config.getSection("mojolly.reporting") flatMap { sect ⇒
-      sect.getInt("pollInterval")
-    } getOrElse 60
-  }
-  
-  case class Alert(target: String,  warn: Int, error: Int)
-  
-  case class GraphiteResponse(metrics: List[Metric])
-  case class Metric(target: String, datapoints: List[Datapoint])
-  case class Datapoint(timestamp: Long, value: Double)
-
-  object GraphiteResponse {
-    def apply(jsonString: String): Option[GraphiteResponse] = {
-      parse(jsonString) match {
-        case JArray(metric) => Some(GraphiteResponse(metric collect {
-          case JObject(JField("target", JString(target)) :: JField("datapoints", JArray(datapoints)) :: Nil) =>
-            Metric(target, datapoints collect {
-              case JArray(List(x: JValue, JInt(timestamp))) => Datapoint(timestamp.toLong, x match {
-                case JDouble(v) => v
-                case _ => 0.0
-              })
-            })
-          }))
-        case _ => None
-      }
-    }
-  }
 }
