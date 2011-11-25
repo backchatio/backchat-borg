@@ -15,9 +15,8 @@ import java.util.ArrayList
 import org.mockito.Mockito._
 
 
-class ZooKeeperClusterClientSpec extends MojollySpecification { def is = //sequential ^
+class ZooKeeperClusterClientSpec extends MojollySpecification { def is =
 
-  //sequential ^
   "A ZooKeeperClusterClient should" ^
     "instantiate a ZooKeeper instance when started" ! context.instantiatesOnStart ^
     "when a Connected message is received" ^

@@ -8,7 +8,7 @@ import sbtprotobuf.{ProtobufPlugin=>PB}
 object BackchatBorgBuild extends Build {
 
   val buildOrganization = "com.mojolly.borg"
-  val buildVersion      = "0.0.4-SNAPSHOT"
+  val buildVersion      = "0.0.5-SNAPSHOT"
   
   val commonSettings = buildSettings ++ Seq(
     version := buildVersion, 
@@ -51,7 +51,7 @@ object BackchatBorgBuild extends Build {
 
   lazy val samples = (Project("borg-samples", file("samples"), settings = commonSettings ++ Seq(
     description := "Some sample applications written with backchat-borg"
-  )) dependsOn(hive, assimil, cadence))
+  )) dependsOn(hive, assimil, cadence, core % "compile;test->test"))
   
   lazy val assimil = Project("borg-assimil", file("assimil"), settings = commonSettings ++ Seq(
     description := "Contains the communication devices for the borg"

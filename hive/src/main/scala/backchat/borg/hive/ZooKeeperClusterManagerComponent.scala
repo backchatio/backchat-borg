@@ -5,6 +5,9 @@ import akka.actor._
 import java.io.IOException
 import org.apache.zookeeper._
 import akka.util.Switch
+import scalaz._
+import Scalaz._
+import scala.util.control.Exception._
 
 trait ZooKeeperClusterManagerComponent extends ClusterManagerComponent {
   this: ClusterNotificationManagerComponent ⇒
@@ -17,7 +20,8 @@ trait ZooKeeperClusterManagerComponent extends ClusterManagerComponent {
     case class NodeChildrenChanged(path: String) extends ZooKeeperMessage
   }
 
-  class ZooKeeperClusterManager(connectString: String, sessionTimeout: Duration, serviceName: String)(implicit zooKeeperFactory: (String, Duration, Watcher) ⇒ ZooKeeper) extends Actor with ClusterManagerHelper with Logging {
+  type ZooKeeperFactory = (String, Duration, Watcher) ⇒ ZooKeeper
+  class ZooKeeperClusterManager(connectString: String, sessionTimeout: Duration, serviceName: String)(implicit zooKeeperFactory: ZooKeeperFactory) extends Actor with ClusterManagerHelper with Logging {
     private val SERVICE_NODE = "/" + serviceName
     private val AVAILABILITY_NODE = SERVICE_NODE + "/available"
     private val MEMBERSHIP_NODE = SERVICE_NODE + "/members"
@@ -111,9 +115,9 @@ trait ZooKeeperClusterManagerComponent extends ClusterManagerComponent {
         if (availableSet.size == 0) {
           currentNodes.foreach { case (id, _) ⇒ makeNodeUnavailable(id) }
         } else {
-          val (available, unavailable) = currentNodes.partition { case (id, _) ⇒ availableSet.contains(id) }
-          available.foreach { case (id, _) ⇒ makeNodeAvailable(id) }
-          unavailable.foreach { case (id, _) ⇒ makeNodeUnavailable(id) }
+          val (available, unavailable) = currentNodes partition { case (id, _) ⇒ availableSet.contains(id) }
+          available foreach { case (id, _) ⇒ makeNodeAvailable(id) }
+          unavailable foreach { case (id, _) ⇒ makeNodeUnavailable(id) }
         }
 
         clusterNotificationManager ! ClusterNotificationMessages.NodesChanged(currentNodes)
@@ -136,20 +140,19 @@ trait ZooKeeperClusterManagerComponent extends ClusterManagerComponent {
         val path = "%s/%d".format(MEMBERSHIP_NODE, node.id)
 
         if (zk.exists(path, false).isNotNull) {
-          logger debug "The node exists already"
-          Some(new InvalidNodeException("A node with id %d already exists".format(node.id)))
+          new InvalidNodeException("A node with id %d already exists".format(node.id)).some
         } else {
+
           try {
-            logger debug "Creating node at %s".format(path)
             zk.create(path, node, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT)
 
             currentNodes += (node.id -> node)
             clusterNotificationManager ! ClusterNotificationMessages.NodesChanged(currentNodes)
-            logger debug  "Notfied notification manager"
+
             None
           } catch {
             case ex: KeeperException if ex.code() == KeeperException.Code.NODEEXISTS ⇒
-              Some(new InvalidNodeException("A node with id %d already exists".format(node.id)))
+              new InvalidNodeException("A node with id %d already exists".format(node.id)).some
           }
         }
       }
@@ -231,34 +234,31 @@ trait ZooKeeperClusterManagerComponent extends ClusterManagerComponent {
     }
 
     private def startZooKeeper() {
-      zooKeeper = try {
+      zooKeeper = (handling(classOf[Exception]) by {
+        case e: IOException => logger error ("Unable to connect to ZooKeeper", e); None
+        case e: Exception => logger error ("Exception while connecting to ZooKeeper", e); None
+      }) {
         watcher = new ClusterWatcher(self)
-        val zk = Some(zooKeeperFactory(connectString, sessionTimeout, watcher))
+        val zk = zooKeeperFactory(connectString, sessionTimeout, watcher)
         logger.debug("Connected to ZooKeeper")
-        zk
-      } catch {
-        case ex: IOException ⇒ {
-          logger.error("Unable to connect to ZooKeeper", ex)
-          None
-        }
-        case ex: Exception ⇒
-          logger.error("Exception while connecting to ZooKeeper", ex)
-          None
+        zk.some
       }
     }
 
     private def verifyZooKeeperStructure(zk: ZooKeeper) {
       logger.debug("Verifying ZooKeeper structure...")
 
+      
       NODES foreach { path ⇒
-        try {
+        val catcher: Catcher[Unit] = {
+          case ex: KeeperException if ex.code() == KeeperException.Code.NODEEXISTS ⇒ ()
+        }
+        catching(catcher) {
           logger.debug("Ensuring %s exists".format(path))
           if (zk.exists(path, false).isNull) {
             logger.debug("%s doesn't exist, creating".format(path))
             zk.create(path, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT)
           }
-        } catch {
-          case ex: KeeperException if ex.code() == KeeperException.Code.NODEEXISTS ⇒ // do nothing
         }
       }
     }
@@ -331,7 +331,7 @@ trait ZooKeeperClusterManagerComponent extends ClusterManagerComponent {
     }
   }
 
-  protected implicit def defaultZooKeeperFactory(connectString: String, sessionTimeout: Duration, watcher: Watcher) =
+  protected implicit def defaultZooKeeperFactory(connectString: String, sessionTimeout: Duration, watcher: Watcher): ZooKeeper =
     new ZooKeeper(connectString, sessionTimeout.getMillis.toInt, watcher)
 
   class ClusterWatcher(zooKeeperManager: ActorRef) extends Watcher {

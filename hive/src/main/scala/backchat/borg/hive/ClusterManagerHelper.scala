@@ -19,5 +19,5 @@ package hive
 
 trait ClusterManagerHelper {
   implicit def mapIntNodeToSetNode(map: collection.Map[Int, Node]): Set[Node] =
-    map.foldLeft(Set[Node]()) { case (set, (key, node)) ⇒ set + node }
+    map.foldLeft(Set[Node]()) { case (set, (_, node)) ⇒ set + node }
 }

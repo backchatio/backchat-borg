@@ -5,6 +5,8 @@ import akka.util.Switch
 import akka.actor._
 import Actor._
 import java.util.concurrent.{ TimeUnit, CountDownLatch }
+import scalaz._
+import Scalaz._
 
 /**
  * ClusterClient companion object provides factory methods for creating a <code>ClusterClient</code> instance.
@@ -63,7 +65,7 @@ trait ClusterClient extends Logging {
           case _                          ⇒ // do nothing
         }
       }).start()
-      (clusterNotificationManager ? ClusterNotificationMessages.AddListener(a)).as[Any]
+      (clusterNotificationManager ? ClusterNotificationMessages.AddListener(a)).get
 
       logger.info("Cluster started")
     }
@@ -90,7 +92,7 @@ trait ClusterClient extends Logging {
    */
   def nodes: Set[Node] = doIfConnected {
     val res = (clusterNotificationManager ? ClusterNotificationMessages.GetCurrentNodes).as[ClusterNotificationMessages.CurrentNodes]
-    res.map(_.nodes) getOrElse Set.empty[Node]
+    res some (_.nodes) none (Set.empty)
   }
 
   /**
@@ -127,11 +129,10 @@ trait ClusterClient extends Logging {
    * @throws InvalidNodeException thrown if there is an error adding the new node to the cluster metadata
    */
   def addNode(nodeId: Int, url: String, partitions: Set[Int]): Node = doIfConnected {
-    if (url == null) throw new NullPointerException
+    require(url.isNotNull)
 
     val node = Node(nodeId, url, false, partitions)
-    val res = (clusterManager ? ClusterManagerMessages.AddNode(node)).as[ClusterManagerMessages.ClusterManagerResponse].get
-    res match {
+    (clusterManager ? ClusterManagerMessages.AddNode(node)).get match {
       case ClusterManagerMessages.ClusterManagerResponse(Some(ex)) ⇒ throw ex
       case ClusterManagerMessages.ClusterManagerResponse(None)     ⇒ node
     }
@@ -146,7 +147,7 @@ trait ClusterClient extends Logging {
    */
   def removeNode(nodeId: Int) {
     handleClusterManagerResponse {
-      (clusterManager ? ClusterManagerMessages.RemoveNode(nodeId)).as[ClusterManagerMessages.ClusterManagerResponse].get
+      (clusterManager ? ClusterManagerMessages.RemoveNode(nodeId)).get
     }
   }
 
@@ -159,7 +160,7 @@ trait ClusterClient extends Logging {
    */
   def markNodeAvailable(nodeId: Int) {
     handleClusterManagerResponse {
-      (clusterManager ? ClusterManagerMessages.MarkNodeAvailable(nodeId)).as[Any].get
+      (clusterManager ? ClusterManagerMessages.MarkNodeAvailable(nodeId)).get
     }
   }
 
@@ -172,7 +173,7 @@ trait ClusterClient extends Logging {
    */
   def markNodeUnavailable(nodeId: Int) {
     handleClusterManagerResponse {
-      (clusterManager ? ClusterManagerMessages.MarkNodeUnavailable(nodeId)).as[Any].get
+      (clusterManager ? ClusterManagerMessages.MarkNodeUnavailable(nodeId)).get
     }
   }
 
@@ -182,7 +183,7 @@ trait ClusterClient extends Logging {
    * @param listener the listener instance to register
    */
   def addListener(listener: ClusterListener): ClusterListenerKey = doIfNotShutdown {
-    if (listener == null) throw new NullPointerException
+    require(listener.isNotNull)
 
     val a = actorOf(new Actor {
       protected def receive = {

@@ -12,7 +12,7 @@
   </appender>
 
   <logger name="akka" level="ERROR" />
-  <logger name="backchat" level="DEBUG" />
+  <logger name="backchat" level="INFO" />
   <root>
     <level value="ERROR"/>
     <appender-ref ref="STDOUT"/>
