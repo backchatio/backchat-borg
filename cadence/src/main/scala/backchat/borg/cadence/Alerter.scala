@@ -2,10 +2,10 @@ package backchat.borg.cadence
 
 import com.weiglewilczek.slf4s.Logger
 import com.ning.http.client.AsyncHttpClient
-import java.lang.Thread
 import java.util.concurrent.{TimeUnit, Executors, ScheduledExecutorService}
-import scopt.OptionParser
 import net.liftweb.json._
+import mojolly._
+import metrics.MetricsConfig
 
 /**
  * Application for alerting.
@@ -14,31 +14,15 @@ object Alerter extends App {
   lazy val loggerName = "ALERT"
   lazy val logger = Logger(loggerName)
 
-  lazy val config = new Config
+  val poller = new GraphitePoller(new AlerterConfig) start()
+  sys.addShutdownHook { poller.shutdown }
 
-  lazy val parser = new OptionParser("scopt") {
-    intOpt("p", "period", "polling period in seconds", {v: Int => config.period = v})
-    opt("u", "url", "Graphite URL", {v: String => config.url = v})
-  }
-  
-  parser parse args
-  val poller = new GraphitePoller(config.url, logger, config.period, TimeUnit.SECONDS) start()
-  addShutdownHook()
-
-  def addShutdownHook() = {
-    Runtime.getRuntime.addShutdownHook(new Thread(new Runnable {
-      def run = {
-        poller.shutdown
-      }
-    }))
-  }
-
-  class GraphitePoller(url: String, logger: Logger, pollingPeriod: Long, pollingTimeUnit: TimeUnit) extends Runnable {
+  class GraphitePoller(config: AlerterConfig) extends Runnable {
     lazy val executor: ScheduledExecutorService = Executors newSingleThreadScheduledExecutor()
     lazy val httpClient = new AsyncHttpClient
 
     def start() = {
-      executor scheduleAtFixedRate(this, 0, pollingPeriod, pollingTimeUnit)
+      executor scheduleAtFixedRate(this, 0, config.period, TimeUnit.SECONDS)
       this
     }
 
@@ -47,16 +31,39 @@ object Alerter extends App {
       httpClient.close()
     }
 
-    def requestUrl = "%s/render?format=json" format url
+    def requestUrl = "%s/render?format=json&from=-%ds" format (config.url, config.period)
 
     def run {
-      val resp = (httpClient prepareGet requestUrl) execute() get()
-      val gr = GraphiteResponse(resp.getResponseBody)
-      println(gr)
+      val req = (httpClient prepareGet requestUrl)
+      config.alerts.get foreach { a =>
+        req addQueryParameter("target", a.target)
+      }
+      val resp = req execute() get()
+      val json = resp.getResponseBody
+      val gr = GraphiteResponse(json)
     }
   }
   
-  class Config(var url: String = "http://graphite", var period: Int = 60)
+  class AlerterConfig(key: String = "application") extends Configuration(ConfigurationContext(key)) with MetricsConfig {
+    val applicationName = "Alerter"
+    val alerts = {
+      config.getSection("mojolly.borg.cadence.alerts") map { section =>
+        section.keys.map(_.split("\\.")).map(_.head) map { k =>
+          Alert(
+            target = section.getString(k + ".graphitekeypattern").get,
+            warn = section.getInt(k + ".error").get,
+            error = section.getInt(k + ".warn").get
+          )
+        }
+      }
+    }
+    val url = reporting map (r => "http://%s" format r.host) getOrElse "http://graphite"
+    val period = config.getSection("mojolly.reporting") flatMap { sect ⇒
+      sect.getInt("pollInterval")
+    } getOrElse 60
+  }
+  
+  case class Alert(target: String,  warn: Int, error: Int)
   
   case class GraphiteResponse(metrics: List[Metric])
   case class Metric(target: String, datapoints: List[Datapoint])
@@ -67,10 +74,12 @@ object Alerter extends App {
       parse(jsonString) match {
         case JArray(metric) => Some(GraphiteResponse(metric collect {
           case JObject(JField("target", JString(target)) :: JField("datapoints", JArray(datapoints)) :: Nil) =>
-            val dp = datapoints collect {
-              case JArray(List(JDouble(value), JInt(timestamp))) => Datapoint(timestamp.toLong, value)
-            }
-            Metric(target, dp)
+            Metric(target, datapoints collect {
+              case JArray(List(x: JValue, JInt(timestamp))) => Datapoint(timestamp.toLong, x match {
+                case JDouble(v) => v
+                case _ => 0.0
+              })
+            })
           }))
         case _ => None
       }
