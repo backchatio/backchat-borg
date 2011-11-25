@@ -7,6 +7,7 @@ import org.apache.zookeeper._
 import akka.util.Switch
 import scalaz._
 import Scalaz._
+import Zero._
 import scala.util.control.Exception._
 
 trait ZooKeeperClusterManagerComponent extends ClusterManagerComponent {
@@ -22,11 +23,11 @@ trait ZooKeeperClusterManagerComponent extends ClusterManagerComponent {
 
   type ZooKeeperFactory = (String, Duration, Watcher) ⇒ ZooKeeper
   class ZooKeeperClusterManager(connectString: String, sessionTimeout: Duration, serviceName: String)(implicit zooKeeperFactory: ZooKeeperFactory) extends Actor with ClusterManagerHelper with Logging {
-    private val SERVICE_NODE = "/" + serviceName
-    private val AVAILABILITY_NODE = SERVICE_NODE + "/available"
-    private val MEMBERSHIP_NODE = SERVICE_NODE + "/members"
+    private val ServiceNode = "/" + serviceName
+    private val AvailabilityNode = ServiceNode + "/available"
+    private val MembershipNode = ServiceNode + "/members"
 
-    private val NODES = List(SERVICE_NODE, AVAILABILITY_NODE, MEMBERSHIP_NODE)
+    private val Nodes = List(ServiceNode, AvailabilityNode, MembershipNode)
 
     private val currentNodes = scala.collection.mutable.Map[Int, Node]()
     private var zooKeeper: Option[ZooKeeper] = None
@@ -48,9 +49,9 @@ trait ZooKeeperClusterManagerComponent extends ClusterManagerComponent {
 
       case Expired      ⇒ handleExpired()
 
-      case NodeChildrenChanged(path) ⇒ if (path == AVAILABILITY_NODE) {
+      case NodeChildrenChanged(path) ⇒ if (path == AvailabilityNode) {
         handleAvailabilityChanged()
-      } else if (path == MEMBERSHIP_NODE) {
+      } else if (path == MembershipNode) {
         handleMembershipChanged()
       } else {
         logger.error("Received a notification for a path that shouldn't be monitored: %s".format(path))
@@ -111,7 +112,7 @@ trait ZooKeeperClusterManagerComponent extends ClusterManagerComponent {
       doIfConnectedWithZooKeeper("an availability changed event") { zk ⇒
         import scala.collection.JavaConversions._
 
-        val availableSet = zk.getChildren(AVAILABILITY_NODE, true).foldLeft(Set[Int]()) { (set, i) ⇒ set + i.toInt }
+        val availableSet = zk.getChildren(AvailabilityNode, true).foldLeft(Set[Int]()) { (set, i) ⇒ set + i.toInt }
         if (availableSet.size == 0) {
           currentNodes.foreach { case (id, _) ⇒ makeNodeUnavailable(id) }
         } else {
@@ -137,7 +138,7 @@ trait ZooKeeperClusterManagerComponent extends ClusterManagerComponent {
       logger.debug("Handling an AddNode(%s) message".format(node))
 
       doIfConnectedWithZooKeeperWithResponse("an AddNode message", "adding node") { zk ⇒
-        val path = "%s/%d".format(MEMBERSHIP_NODE, node.id)
+        val path = "%s/%d".format(MembershipNode, node.id)
 
         if (zk.exists(path, false).isNotNull) {
           new InvalidNodeException("A node with id %d already exists".format(node.id)).some
@@ -162,16 +163,8 @@ trait ZooKeeperClusterManagerComponent extends ClusterManagerComponent {
       logger.debug("Handling a RemoveNode(%d) message".format(nodeId))
 
       doIfConnectedWithZooKeeperWithResponse("a RemoveNode message", "deleting node") { zk ⇒
-        val path = "%s/%d".format(MEMBERSHIP_NODE, nodeId)
-
-        if (zk.exists(path, false) != null) {
-          try {
-            zk.delete(path, -1)
-          } catch {
-            case ex: KeeperException if ex.code() == KeeperException.Code.NONODE ⇒ // do nothing
-          }
-        }
-
+        val path = "%s/%d".format(MembershipNode, nodeId)
+        deletePath(zk, path)
         currentNodes -= nodeId
         clusterNotificationManager ! ClusterNotificationMessages.NodesChanged(currentNodes)
         None
@@ -182,13 +175,12 @@ trait ZooKeeperClusterManagerComponent extends ClusterManagerComponent {
       logger.debug("Handling a MarkNodeAvailable(%d) message".format(nodeId))
 
       doIfConnectedWithZooKeeperWithResponse("a MarkNodeAvailable message", "marking node available") { zk ⇒
-        val path = "%s/%d".format(AVAILABILITY_NODE, nodeId)
+        val path = "%s/%d".format(AvailabilityNode, nodeId)
 
-        if (zk.exists(path, false) == null) {
-          try {
+        
+        if (zk.exists(path, false).isNull) {
+          ignoringIf(_.code == KeeperException.Code.NODEEXISTS) {
             zk.create(path, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL)
-          } catch {
-            case ex: KeeperException if ex.code() == KeeperException.Code.NODEEXISTS ⇒ // do nothing
           }
         }
 
@@ -197,39 +189,45 @@ trait ZooKeeperClusterManagerComponent extends ClusterManagerComponent {
         None
       }
     }
+    
+    private def deletePath(zk: ZooKeeper, path: String) {
+      if (zk.exists(path, false).isNotNull) {
+        ignoringIf(_.code == KeeperException.Code.NONODE) {
+          zk.delete(path, -1)
+        }
+      }
+    }
 
     private def handleMarkNodeUnavailable(nodeId: Int) {
       logger.debug("Handling a MarkNodeUnavailable(%d) message".format(nodeId))
 
       doIfConnectedWithZooKeeperWithResponse("a MarkNodeUnavailable message", "marking node unavailable") { zk ⇒
-        val path = "%s/%d".format(AVAILABILITY_NODE, nodeId)
-
-        if (zk.exists(path, false) != null) {
-          try {
-            zk.delete(path, -1)
-            None
-          } catch {
-            case ex: KeeperException if ex.code() == KeeperException.Code.NONODE ⇒ // do nothing
-          }
-        }
-
+        val path = "%s/%d".format(AvailabilityNode, nodeId)
+        deletePath(zk, path)
         makeNodeUnavailable(nodeId)
         clusterNotificationManager ! ClusterNotificationMessages.NodesChanged(currentNodes)
         None
       }
     }
 
-    private def handleShutdown() {
-      logger.debug("Handling a Shutdown message")
+    private def ignoringIf[T](predicate: KeeperException => Boolean)(body: => T)(implicit z: Zero[T]): T = {
+      val catcher: Catcher[T] = {
+        case ex: KeeperException if predicate(ex) => z.zero
+      }
+      catching(catcher) apply body
+    }
 
-      try {
+    private def handleShutdown() {
+      logger debug "Handling a Shutdown message"
+
+      (handling(classOf[Exception])
+        by (logger.error("Exception when closing connection to ZooKeeper", _))
+        andFinally {
+          logger info "ZooKeeperClusterManager shut down"
+          self.stop()
+        }) {
         watcher.shutdown()
         zooKeeper.foreach(_.close())
-      } catch {
-        case ex: Exception ⇒ logger.error("Exception when closing connection to ZooKeeper", ex)
-      } finally {
-        logger.debug("ZooKeeperClusterManager shut down")
-        self.stop()
       }
     }
 
@@ -249,16 +247,14 @@ trait ZooKeeperClusterManagerComponent extends ClusterManagerComponent {
       logger.debug("Verifying ZooKeeper structure...")
 
       
-      NODES foreach { path ⇒
-        val catcher: Catcher[Unit] = {
-          case ex: KeeperException if ex.code() == KeeperException.Code.NODEEXISTS ⇒ ()
-        }
-        catching(catcher) {
+      Nodes foreach { path ⇒
+        ignoringIf(_.code() == KeeperException.Code.NODEEXISTS) {
           logger.debug("Ensuring %s exists".format(path))
           if (zk.exists(path, false).isNull) {
             logger.debug("%s doesn't exist, creating".format(path))
             zk.create(path, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT)
           }
+          ()
         }
       }
     }
@@ -266,14 +262,14 @@ trait ZooKeeperClusterManagerComponent extends ClusterManagerComponent {
     private def lookupCurrentNodes(zk: ZooKeeper) {
       import scala.collection.JavaConversions._
 
-      val members = zk.getChildren(MEMBERSHIP_NODE, true)
-      val available = zk.getChildren(AVAILABILITY_NODE, true)
+      val members = zk.getChildren(MembershipNode, true)
+      val available = zk.getChildren(AvailabilityNode, true)
 
       currentNodes.clear()
 
       members.foreach { member ⇒
         val id = member.toInt
-        currentNodes += (id -> Node(id, zk.getData("%s/%s".format(MEMBERSHIP_NODE, member), false, null), available.contains(member)))
+        currentNodes += (id -> Node(id, zk.getData("%s/%s".format(MembershipNode, member), false, null), available.contains(member)))
       }
     }
 
@@ -290,16 +286,11 @@ trait ZooKeeperClusterManagerComponent extends ClusterManagerComponent {
     }
 
     private def doWithZooKeeper(what: String)(block: ZooKeeper ⇒ Unit) {
-      zooKeeper match {
-        case Some(zk) ⇒
-          try {
-            block(zk)
-          } catch {
-            case ex: KeeperException ⇒ logger.error("ZooKeeper threw an exception", ex)
-            case ex: Exception       ⇒ logger.error("Unhandled exception while working with ZooKeeper", ex)
-          }
-
-        case None ⇒ logger.error(
+      zooKeeper some { zk =>
+        ((handling(classOf[KeeperException]) by (logger.error("ZooKeeper threw an exception",_))) or
+          (handling(classOf[Exception]) by (logger.error("Unhandled exception while working with ZooKeeper", _)))){ block(zk) }
+      } none {
+        logger.error(
           "Received %s when ZooKeeper is None, this should never happen. Please report a bug including the stack trace provided.".format(what),
           new Exception)
       }
@@ -316,12 +307,11 @@ trait ZooKeeperClusterManagerComponent extends ClusterManagerComponent {
 
       if (connected) {
         doWithZooKeeper(what) { zk ⇒
-          val response = try {
-            block(zk)
-          } catch {
-            case ex: KeeperException ⇒ Some(new ClusterException("Error while %s".format(exceptionDescription), ex))
-            case ex: Exception       ⇒ Some(new ClusterException("Unexpected exception while %s".format(exceptionDescription), ex))
-          }
+          val response =
+            ((handling(classOf[KeeperException]) by (new ClusterException("Error while %s".format(exceptionDescription), _).some)) or
+            (handling(classOf[Exception]) by (new ClusterException("Unexpected exception while  %s".format(exceptionDescription), _).some))) {
+              block(zk)
+            }
 
           self tryReply ClusterManagerResponse(response)
         }
