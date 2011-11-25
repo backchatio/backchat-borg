@@ -135,15 +135,17 @@ trait ZooKeeperClusterManagerComponent extends ClusterManagerComponent {
       doIfConnectedWithZooKeeperWithResponse("an AddNode message", "adding node") { zk ⇒
         val path = "%s/%d".format(MEMBERSHIP_NODE, node.id)
 
-        if (zk.exists(path, false) != null) {
+        if (zk.exists(path, false).isNotNull) {
+          logger debug "The node exists already"
           Some(new InvalidNodeException("A node with id %d already exists".format(node.id)))
         } else {
           try {
+            logger debug "Creating node at %s".format(path)
             zk.create(path, node, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT)
 
             currentNodes += (node.id -> node)
             clusterNotificationManager ! ClusterNotificationMessages.NodesChanged(currentNodes)
-
+            logger debug  "Notfied notification manager"
             None
           } catch {
             case ex: KeeperException if ex.code() == KeeperException.Code.NODEEXISTS ⇒
@@ -222,10 +224,10 @@ trait ZooKeeperClusterManagerComponent extends ClusterManagerComponent {
         zooKeeper.foreach(_.close())
       } catch {
         case ex: Exception ⇒ logger.error("Exception when closing connection to ZooKeeper", ex)
+      } finally {
+        logger.debug("ZooKeeperClusterManager shut down")
+        self.stop()
       }
-
-      logger.debug("ZooKeeperClusterManager shut down")
-      self.stop()
     }
 
     private def startZooKeeper() {

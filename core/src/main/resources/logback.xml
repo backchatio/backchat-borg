@@ -6,7 +6,7 @@
     <!-- encoders are assigned the type
          ch.qos.logback.classic.encoder.PatternLayoutEncoder by default -->
     <encoder>
-      <pattern>[%t] [%4levelcolor] [%d{ISO8601}] %c{1}: %m%n</pattern>
+      <pattern>[%4levelcolor] [%t] [%d{ISO8601}] %c{1}: %m%n</pattern>
       <!--<pattern>%-4relative [%thread] %-5level %logger{35} - %msg %n</pattern>-->
     </encoder>
   </appender>
