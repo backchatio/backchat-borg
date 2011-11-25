@@ -24,4 +24,6 @@ message Node {
   required int32 id = 1;
   required string url = 2;
   repeated int32 partition = 3;
+  optional string reporting_url = 4;
+  optional string pubsub_url = 5;
 }

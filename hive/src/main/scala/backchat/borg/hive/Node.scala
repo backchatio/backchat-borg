@@ -24,9 +24,9 @@ object Node {
 
     try {
       val node = BorgProtos.Node.newBuilder.mergeFrom(bytes).build
-      val partitions = node.getPartitionList.asInstanceOf[java.util.List[Int]].foldLeft(Set[Int]()) { (set, i) ⇒ set + i }
+      val partitions = node.getPartitionList.asInstanceOf[java.util.List[Int]].foldLeft(Set.empty[Int])(_ + _)
 
-      Node(node.getId, node.getUrl, available, partitions)
+      Node(node.getId, node.getUrl, available, partitions, Option(node.getReportingUrl), Option(node.getPubsubUrl))
     } catch {
       case ex: InvalidProtocolBufferException ⇒ throw new InvalidNodeException("Error deserializing node", ex)
     }
@@ -41,8 +41,11 @@ object Node {
    */
   implicit def nodeToByteArray(node: Node): Array[Byte] = {
     val builder = BorgProtos.Node.newBuilder
+
     builder.setId(node.id).setUrl(node.url)
     node.partitionIds.foreach(builder.addPartition(_))
+    node.reportingUrl foreach builder.setReportingUrl
+    node.pubsubUrl foreach  builder.setPubsubUrl
 
     builder.build.toByteArray
   }
@@ -52,13 +55,14 @@ object Node {
  * A representation of a physical node in the cluster.
  *
  * @param id the id of the node
- * @param address the url to which requests can be sent to the node
+ * @param url the url to which requests can be sent to the node
  * @param available whether or not the node is currently able to process requests
  * @param partitions the partitions for which the node can handle requests
+ * @param reportingUrl
  */
-final case class Node(id: Int, url: String, available: Boolean, partitionIds: Set[Int] = Set.empty) {
-  if (url == null) throw new NullPointerException("url must not be null")
-  if (partitionIds == null) throw new NullPointerException("partitions must not be null")
+final case class Node(id: Int, url: String, available: Boolean, partitionIds: Set[Int] = Set.empty, reportingUrl: Option[String] = None, pubsubUrl: Option[String] = None) {
+  require(url.isNotNull, "url must not be null")
+  require(partitionIds.isNotNull, "partitions must not be null")
 
   override def hashCode = id.hashCode
 
@@ -67,5 +71,5 @@ final case class Node(id: Int, url: String, available: Boolean, partitionIds: Se
     case _          ⇒ false
   }
 
-  override def toString = "Node(%d,%s,[%s],%b)".format(id, url, partitionIds.mkString(","), available)
+  override def toString = "Node(%d,%s,[%s],%b)".format(id, url, partitionIds.mkString(","), available, reportingUrl, pubsubUrl)
 }
