@@ -6,25 +6,11 @@ import akka.actor._
 import Actor._
 import java.util.concurrent.TimeUnit
 import org.multiverse.api.latches.StandardLatch
-import mojolly.testing.AkkaSpecification
 import akka.testkit.Testing._
 import akka.util.{ Duration => AkkaDuration }
 import AkkaDuration.timeFactor
+import mojolly.testing.{TimeHelpers, AkkaSpecification}
 
-/**
- * Multiplying numbers used in test timeouts by a factor, set by system property.
- * Useful for Jenkins builds (where the machine may need more time).
- */
-trait TimeHelpers {
-  def testTime(t: Int): Int = (timeFactor * t).toInt
-  def testTime(t: Long): Long = (timeFactor * t).toLong
-  def testTime(t: Float): Float = (timeFactor * t).toFloat
-  def testTime(t: Double): Double = timeFactor * t
-
-  object sleep {
-    def ->(duration:Duration) = Thread.sleep(testTime(duration.millis))
-  }
-}
 
 class ClusterClientSpec extends AkkaSpecification with TimeHelpers { def is =
 

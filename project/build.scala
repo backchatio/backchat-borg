@@ -24,6 +24,7 @@ object BackchatBorgBuild extends Build {
     description := "The shared classes for the borg",
     ivyXML := <dependencies>
                 <exclude module="slf4j-log4j12" />
+                <exclude module="log4j" />
               </dependencies>,
     libraryDependencies ++= Seq(
       "com.google.protobuf" % "protobuf-java" % "2.4.1",
@@ -40,6 +41,7 @@ object BackchatBorgBuild extends Build {
     description := "Provides the clustering and High-Availabillity for the backchat system",
     ivyXML := <dependencies>
                 <exclude module="slf4j-log4j12" />
+                <exclude module="log4j" />
               </dependencies>)) dependsOn(core % "compile;test->test")
 
   lazy val cadence = Project("borg-cadence", file("cadence"), settings = commonSettings ++ Seq(
