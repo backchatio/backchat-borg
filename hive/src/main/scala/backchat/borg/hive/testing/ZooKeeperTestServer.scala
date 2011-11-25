@@ -4,9 +4,6 @@ package hive
 package testing
 
 import collection.mutable
-import java.io.File
-import org.apache.commons.lang.SystemUtils
-import com.eaio.uuid.UUID
 import org.apache.zookeeper.server.persistence.FileTxnSnapLog
 import org.apache.zookeeper.server.ZooKeeperServer.BasicDataTreeBuilder
 import org.apache.zookeeper.server.{ NIOServerCnxnFactory, ZooKeeperServer, ServerCnxnFactory }
