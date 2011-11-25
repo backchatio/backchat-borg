@@ -1,11 +1,13 @@
 package com.twitter.zookeeper
 
+import mojolly.LibraryImports._
 import org.apache.zookeeper.CreateMode
 import org.apache.zookeeper.CreateMode._
 import org.apache.zookeeper.KeeperException.NoNodeException
 import org.apache.zookeeper.data.Id
 import scala.collection.mutable
 import backchat.borg.hive.{ZooKeeperClientContext, ZooKeeperSpecification}
+import mojolly.testing.TimeHelpers
 
 
 class ZooKeeperClientSpec extends ZooKeeperSpecification {
@@ -26,7 +28,7 @@ class ZooKeeperClientSpec extends ZooKeeperSpecification {
 
   def specify = ZooKeeperSpecContext(zookeeperServer.port)
 
-  case class ZooKeeperSpecContext(port: Int) extends ZooKeeperClientContext(port) {
+  case class ZooKeeperSpecContext(port: Int) extends ZooKeeperClientContext(port) with TimeHelpers {
 
     def instantiatesWithFake = this { zkClient must not beNull }
     
@@ -65,7 +67,7 @@ class ZooKeeperClientSpec extends ZooKeeperSpecification {
       }
       zkClient.create(node, data, createMode)
       zkClient.watchNode(node, watcher)
-      Thread.sleep(50L)
+      sleep -> 50.millis
       val res = watchCount mustEqual 1
       zkClient.delete("/datanode")
       res
@@ -85,12 +87,12 @@ class ZooKeeperClientSpec extends ZooKeeperSpecification {
       val r2 = children must haveTheSameElementsAs(List("a", "b"))
       val r3 = watchCount must_== 1
       zkClient.createPath("/tree/c")
-      Thread.sleep(50L)
+      sleep -> 50.millis
       val r4 = children.size must_== 3
       val r5 = children must haveTheSameElementsAs(List("a", "b", "c"))
       val r6 = watchCount must_== 2
       zkClient.delete("/tree/a")
-      Thread.sleep(50L)
+      sleep -> 50.millis
       val r7 = children.size must_== 2
       val r8 = children must haveTheSameElementsAs(List("b", "c"))
       val r9 = watchCount must_== 3
@@ -119,12 +121,12 @@ class ZooKeeperClientSpec extends ZooKeeperSpecification {
       val r2 = children.keySet must haveTheSameElementsAs(List("a", "b"))
       val r3 = watchCount must_== 2
       mkNode("c")
-      Thread.sleep(50L)
+      sleep -> 50.millis
       val r4 = children.size must_== 3
       val r5 = children.keySet must haveTheSameElementsAs(List("a", "b", "c"))
       val r6 = watchCount must_== 3
       zkClient.delete("/root/a")
-      Thread.sleep(50L)
+      sleep -> 50.millis
       val r7 = children.size must_== 2
       val r8 = children.keySet must haveTheSameElementsAs(List("b", "c"))
       val r9 = watchCount must_== 4

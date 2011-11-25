@@ -16,7 +16,6 @@ class ZooKeeperClient(servers: String, sessionTimeout: Int, basePath: String,
 
   @volatile
   private var zk: ZooKeeper = null
-  connect()
 
   def this(servers: String, sessionTimeout: Int, basePath: String) =
     this(servers, sessionTimeout, basePath, None)
@@ -46,7 +45,7 @@ class ZooKeeperClient(servers: String, sessionTimeout: Int, basePath: String,
   /**
    * connect() attaches to the remote zookeeper and sets an instance variable.
    */
-  private def connect() {
+  def connect() {
     val connectionLatch = new CountDownLatch(1)
     val assignLatch = new CountDownLatch(1)
     if (zk != null) {
@@ -60,12 +59,12 @@ class ZooKeeperClient(servers: String, sessionTimeout: Int, basePath: String,
         }
       })
     assignLatch.countDown()
-    logger.info("Attempting to connect to zookeeper servers %s" format servers)
+    logger info "Attempting to connect to zookeeper servers %s".format(servers)
     connectionLatch.await()
   }
 
   def sessionEvent(assignLatch: CountDownLatch, connectionLatch: CountDownLatch, event: WatchedEvent) {
-    logger.info("Zookeeper event: %s".format(event))
+    logger debug  "Zookeeper event: %s".format(event)
     assignLatch.await()
     event.getState match {
       case KeeperState.SyncConnected ⇒ {
@@ -73,7 +72,7 @@ class ZooKeeperClient(servers: String, sessionTimeout: Int, basePath: String,
           watcher.map(fn ⇒ fn(this))
         } catch {
           case e: Exception ⇒
-            logger.error("Exception during zookeeper connection established callback", e)
+            logger error ("Exception during zookeeper connection established callback", e)
         }
         connectionLatch.countDown()
       }
@@ -104,6 +103,8 @@ class ZooKeeperClient(servers: String, sessionTimeout: Int, basePath: String,
   }
 
   def close() = zk.close
+
+  def exists(path: String) = zk.exists(path, false).isNotNull
 
   def isAlive: Boolean = {
     // If you can get the root, then we're alive.

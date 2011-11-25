@@ -3,18 +3,21 @@ package borg
 package hive
 package tests
 
-import org.specs2.Specification
 import org.specs2.mock.Mockito
 import akka.actor._
 import Actor._
 import org.specs2.execute.Result
 import org.specs2.specification.{Step, Fragments, Around}
-import org.apache.zookeeper.{Watcher, ZooKeeper}
 import org.apache.zookeeper.data.Stat
+import mojolly.testing.{MojollySpecification, TimeHelpers}
+import org.apache.zookeeper.{ZooDefs, CreateMode, Watcher, ZooKeeper}
+import java.util.ArrayList
+import org.mockito.Mockito._
 
 
-class ZooKeeperClusterClientSpec extends Specification { def is =
+class ZooKeeperClusterClientSpec extends MojollySpecification { def is = //sequential ^
 
+  //sequential ^
   "A ZooKeeperClusterClient should" ^
     "instantiate a ZooKeeper instance when started" ! context.instantiatesOnStart ^
     "when a Connected message is received" ^
@@ -54,7 +57,7 @@ class ZooKeeperClusterClientSpec extends Specification { def is =
       "add the node to zookeeper if it doesn't exist" ! context.addsNodeForAvailable ^
       "do nothing if the znode already exists" ! context.doNothingIfAlreadyExists ^
       "notify listeners of list change" ! context.notifiesForAvailable ^ bt  ^
-    "when a MarkAvailable message is received" ^
+    "when a MarkUnavailable message is received" ^
       "throw a ClusterDisconnectedException if not connected" ! context.throwsClusterDisconnectedForMarkUnavailable ^
       "remove the node from zookeeper if it exists" ! context.removesNodeForUnavailable ^
       "do nothing if the znode doesn't exists" ! context.doNothingIfDoesNotExist ^
@@ -62,18 +65,16 @@ class ZooKeeperClusterClientSpec extends Specification { def is =
   end
 
 
-//  val zooKeeperServer = new ZooKeeperTestServer()
-//  override def map(fs: => Fragments) = Step(zooKeeperServer.start()) ^ fs ^ Step(zooKeeperServer.stop())
   override def map(fs: => Fragments) = super.map(fs ^ Step(registry.shutdownAll()))
 
   def context = new ZooKeeperClusterClientSpecContext
 
-  class ZooKeeperClusterClientSpecContext extends Mockito with Around
+  class ZooKeeperClusterClientSpecContext extends Mockito with Around with TimeHelpers
       with ZooKeeperClusterManagerComponent with ClusterNotificationManagerComponent{
     import ZooKeeperMessages._
     import ClusterManagerMessages._
 
-    val mockZooKeeper = smartMock[ZooKeeper]
+    val mockZooKeeper = mock[ZooKeeper]
 
     var connectedCount = 0
     var disconnectedCount = 0
@@ -81,9 +82,8 @@ class ZooKeeperClusterClientSpec extends Specification { def is =
     var shutdownCount = 0
     var nodesReceived: Set[Node] = Set()
 
-    //def zkf(connectString: String, sessionTimeout: Duration, watcher: Watcher) = mockZooKeeper
-    val clusterManager = actorOf(new ZooKeeperClusterManager("", new Duration(0), "test"))
-//    val clusterManager = actorOf(new ZooKeeperClusterManager("localhost:%s".format(zooKeeperServer.port), new Duration(3000), "test"))
+    def zkf(connectString: String, sessionTimeout: Duration, watcher: Watcher) = mockZooKeeper
+    val clusterManager = actorOf(new ZooKeeperClusterManager("", new Duration(0), "test")(zkf))
 
     val rootNode = "/test"
     val membershipNode = rootNode + "/members"
@@ -102,8 +102,8 @@ class ZooKeeperClusterClientSpec extends Specification { def is =
       clusterManager.start()
       clusterNotificationManager.start()
       val res = t
-      clusterManager ! Shutdown
-      clusterNotificationManager ! Shutdown
+      if (clusterManager.isRunning) clusterManager ! Shutdown
+      if (clusterNotificationManager.isRunning) clusterNotificationManager ! ClusterNotificationMessages.Shutdown
       res
     }
 
@@ -125,473 +125,546 @@ class ZooKeeperClusterClientSpec extends Specification { def is =
       znodes.foreach(mockZooKeeper.exists(_, false) returns mock[Stat])
 
       clusterManager ! Connected
-      Thread.sleep(50)
+      sleep -> 100.millis
 
       znodes.map(there was one(mockZooKeeper).exists(_, false)).reduce(_ and _)
     }
 
 
-    def createsNodesIfMissing =  {
-//      znodes.foreach { path =>
-//        mockZooKeeper.exists(path, false) returns null
-//        mockZooKeeper.create(path, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT) returns path
-//      }
-//
-//      clusterManager ! Connected
-//      Thread sleep 10
-//
-//      znodes map { path =>
-//        there was one(mockZooKeeper).exists(path, false) and
-//        (there was one(mockZooKeeper).create(path, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT))
-//      } reduce (_ and _)
-      pending
+    def createsNodesIfMissing =  this {
+      znodes.foreach { path =>
+        mockZooKeeper.exists(path, false) returns null
+        mockZooKeeper.create(path, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT) returns path
+      }
+
+      clusterManager ! Connected
+      sleep -> 50.millis
+
+      znodes map { path =>
+        there was one(mockZooKeeper).exists(path, false) and
+        (there was one(mockZooKeeper).create(path, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT))
+      } reduce (_ and _)
     }
 
-    def calculatesCurrentNodes = {
-//      val membership = new ArrayList[String]
-//      membership.add("1")
-//      membership.add("2")
-//      membership.add("3")
-//
-//      val availability = membership.clone.asInstanceOf[ArrayList[String]]
-//      availability.remove(2)
-//
-//      val nodes = Array(Node(1, "localhost:31313", true, Set(1, 2)),
-//        Node(2, "localhost:31314", false, Set(2, 3)), Node(3, "localhost:31315", true, Set(2, 3)))
-//
-//      mockZooKeeper.getChildren(membershipNode, true) returns membership
-//      nodes.foreach { node =>
-//        mockZooKeeper.getData("%s/%d".format(membershipNode, node.id), false, null) returns Node.nodeToByteArray(node)
-//      }
-//      mockZooKeeper.getChildren(availabilityNode, true) returns availability
-//
-//      clusterManager ! Connected
-//      Thread sleep 50
-//
-//      got {
-//        (one(mockZooKeeper).getChildren(membershipNode, true))
-//        (nodes map {node =>
-//          one(mockZooKeeper).getData("%s/%d".format(membershipNode, node.id), false, null)
-//        })
-//        (one(mockZooKeeper).getChildren(availabilityNode, true))
-//      }
-      pending
+    def calculatesCurrentNodes = this {
+      val membership = new ArrayList[String]
+      membership.add("1")
+      membership.add("2")
+      membership.add("3")
+
+      val availability = membership.clone.asInstanceOf[ArrayList[String]]
+      availability.remove(2)
+
+      val nodes = Array(Node(1, "localhost:31313", true, Set(1, 2)),
+        Node(2, "localhost:31314", false, Set(2, 3)), Node(3, "localhost:31315", true, Set(2, 3)))
+
+      mockZooKeeper.getChildren(membershipNode, true) returns membership
+      nodes.foreach { node =>
+        mockZooKeeper.getData("%s/%d".format(membershipNode, node.id), false, null) returns Node.nodeToByteArray(node)
+      }
+      mockZooKeeper.getChildren(availabilityNode, true) returns availability
+
+      clusterManager ! Connected
+      sleep -> 100.millis
+
+      got {
+        (one(mockZooKeeper).getChildren(membershipNode, true))
+        (nodes map {node =>
+          one(mockZooKeeper).getData("%s/%d".format(membershipNode, node.id), false, null)
+        })
+        (one(mockZooKeeper).getChildren(availabilityNode, true))
+      }
     }
 
-    def sendsNotificationForConnected = {
-//      val membership = new ArrayList[String]
-//      membership.add("1")
-//      membership.add("2")
-//      membership.add("3")
-//
-//      val availability = membership.clone.asInstanceOf[ArrayList[String]]
-//      availability.remove(1)
-//
-//      val nodes = Array(Node(1, "localhost:31313", true, Set(1, 2)),
-//        Node(2, "localhost:31314", false, Set(2, 3)), Node(3, "localhost:31315", true, Set(2, 3)))
-//
-//      mockZooKeeper.getChildren(membershipNode, true) returns membership
-//      nodes.foreach { node =>
-//        mockZooKeeper.getData("%s/%d".format(membershipNode, node.id), false, null) returns Node.nodeToByteArray(node)
-//      }
-//      mockZooKeeper.getChildren(availabilityNode, true) returns availability
-//
-//      clusterManager ! Connected
-//      Thread sleep 50
-//
-//      (connectedCount must eventually(be_==(1))) and
-//      (nodesReceived.size must be_==(3)) and
-//      (nodesReceived must haveTheSameElementsAs(nodes)) and
-//      (nodesReceived map (node => node must be_==(nodes(node.id - 1))) reduce (_ and _))
-      pending
+    def sendsNotificationForConnected = this {
+      val membership = new ArrayList[String]
+      membership.add("1")
+      membership.add("2")
+      membership.add("3")
+
+      val availability = membership.clone.asInstanceOf[ArrayList[String]]
+      availability.remove(1)
+
+      val nodes = Array(Node(1, "localhost:31313", true, Set(1, 2)),
+        Node(2, "localhost:31314", false, Set(2, 3)), Node(3, "localhost:31315", true, Set(2, 3)))
+
+      mockZooKeeper.getChildren(membershipNode, true) returns membership
+      nodes.foreach { node =>
+        mockZooKeeper.getData("%s/%d".format(membershipNode, node.id), false, null) returns Node.nodeToByteArray(node)
+      }
+      mockZooKeeper.getChildren(availabilityNode, true) returns availability
+
+      clusterManager ! Connected
+      sleep -> 100.millis
+
+      (connectedCount must eventually(be_==(1))) and
+      (nodesReceived.size must be_==(3)) and
+      (nodesReceived must haveTheSameElementsAs(nodes)) and
+      (nodesReceived map (node => node must be_==(nodes(node.id - 1))) reduce (_ and _))
     }
 
-    def sendsNotificationForDisconnected = {
-//      clusterManager ! Connected
-//      clusterManager ! Disconnected
-//
-//      disconnectedCount must eventually(be_==(1))
-      pending
+    def sendsNotificationForDisconnected = this {
+      clusterManager ! Connected
+      clusterManager ! Disconnected
+
+      disconnectedCount must be_==(1).eventually
     }
 
-    def doNothingIfAlreadyDisconnected = {
-//      clusterManager ! Disconnected
-//
-//      disconnectedCount must eventually(be_==(0))
-      pending
+    def doNothingIfAlreadyDisconnected = this {
+      clusterManager ! Disconnected
+
+      disconnectedCount must eventually(be_==(0))
     }
 
-    def reconnectsOnExpired = {
-//      var callCount = 0
-//      def countedZkf(connectString: String, sessionTimeout: Duration, watcher: Watcher) = {
-//        callCount += 1
-//        mockZooKeeper
-//      }
-//
-//      val zkm = actorOf(new ZooKeeperClusterManager("", new Duration(0), "")(countedZkf _))
-//      zkm.start
-//      zkm ! Connected
-//      zkm ! Expired
-//
-//      val res = callCount must eventually(be_==(2))
-//
-//      zkm ! Shutdown
-//
-//      res
-      pending
+    def reconnectsOnExpired = this {
+      var callCount = 0
+      def countedZkf(connectString: String, sessionTimeout: Duration, watcher: Watcher) = {
+        callCount += 1
+        mockZooKeeper
+      }
+
+      val zkm = actorOf(new ZooKeeperClusterManager("", new Duration(0), "")(countedZkf _))
+      zkm.start
+      zkm ! Connected
+      zkm ! Expired
+
+      val res = callCount must eventually(be_==(2))
+
+      zkm ! Shutdown
+
+      res
     }
 
-    def handlesAllNodesUnavailable =  {
-//      val membership = new ArrayList[String]
-//      membership.add("1")
-//      membership.add("2")
-//      membership.add("3")
-//
-//      val newAvailability = new ArrayList[String]
-//
-//      val nodes = Array(Node(1, "localhost:31313", true, Set(1, 2)),
-//        Node(2, "localhost:31314", true, Set(2, 3)), Node(3, "localhost:31315", false, Set(2, 3)))
-//
-//      mockZooKeeper.getChildren(membershipNode, true) returns membership
-//      nodes.foreach { node =>
-//        mockZooKeeper.getData("%s/%d".format(membershipNode, node.id), false, null) returns Node.nodeToByteArray(node)
-//      }
-//      mockZooKeeper.getChildren(availabilityNode, true) returns membership thenReturns newAvailability
-//
-//      clusterManager ! Connected
-//
-//      val res1 = (nodesReceived.size must eventually(be_==(3))) and
-//      (nodesReceived must haveTheSameElementsAs(nodes)) and
-//      (nodesReceived map { _.available must beTrue } reduce (_ and _))
-//
-//      clusterManager ! NodeChildrenChanged(availabilityNode)
-//
-//      val res2 = (nodesChangedCount must eventually(be_==(1)))
-//      (nodesReceived.size must be_==(3)) and
-//      (nodesReceived must haveTheSameElementsAs(nodes)) and
-//      (nodesReceived map { n => n.available must beFalse } reduce (_ and _))
-//
-//      res1 and res2 and (there were two(mockZooKeeper).getChildren(availabilityNode, true))
-      pending
+    def handlesAllNodesUnavailable =  this {
+      val membership = new ArrayList[String]
+      membership.add("1")
+      membership.add("2")
+      membership.add("3")
+
+      val newAvailability = new ArrayList[String]
+
+      val nodes = Array(Node(1, "localhost:31313", true, Set(1, 2)),
+        Node(2, "localhost:31314", true, Set(2, 3)), Node(3, "localhost:31315", false, Set(2, 3)))
+
+      mockZooKeeper.getChildren(membershipNode, true) returns membership
+      nodes.foreach { node =>
+        mockZooKeeper.getData("%s/%d".format(membershipNode, node.id), false, null) returns Node.nodeToByteArray(node)
+      }
+      mockZooKeeper.getChildren(availabilityNode, true) returns membership thenReturns newAvailability
+
+      clusterManager ! Connected
+
+      val res1 = (nodesReceived.size must eventually(be_==(3))) and
+      (nodesReceived must haveTheSameElementsAs(nodes)) and
+      (nodesReceived map { _.available must beTrue } reduce (_ and _))
+
+      clusterManager ! NodeChildrenChanged(availabilityNode)
+
+      val res2 = (nodesChangedCount must eventually(be_==(1)))
+      (nodesReceived.size must be_==(3)) and
+      (nodesReceived must haveTheSameElementsAs(nodes)) and
+      (nodesReceived map { n => n.available must beFalse } reduce (_ and _))
+
+      res1 and res2 and (there were two(mockZooKeeper).getChildren(availabilityNode, true))
     }
 
-    def updatesAvailabilityAndNotifiesListeners = {
-//      val membership = new ArrayList[String]
-//      membership.add("1")
-//      membership.add("2")
-//      membership.add("3")
-//
-//      val availability = new ArrayList[String]
-//      availability.add("2")
-//
-//      val newAvailability = new ArrayList[String]
-//      newAvailability.add("1")
-//      newAvailability.add("3")
-//
-//      val nodes = Array(Node(1, "localhost:31313", true, Set(1, 2)),
-//        Node(2, "localhost:31314", true, Set(2, 3)), Node(3, "localhost:31315", false, Set(2, 3)))
-//
-//      mockZooKeeper.getChildren(membershipNode, true) returns membership
-//      nodes.foreach { node =>
-//        mockZooKeeper.getData("%s/%d".format(membershipNode, node.id), false, null) returns Node.nodeToByteArray(node)
-//      }
-//      mockZooKeeper.getChildren(availabilityNode, true) returns availability thenReturns newAvailability
-//
-//      clusterManager ! Connected
-//
-//      val res1 = (nodesReceived.size must eventually(be_==(3))) and
-//      (nodesReceived must haveTheSameElementsAs(nodes)) and
-//      (nodesReceived map { n =>
-//        if (n.id == 2) n.available must beTrue else n.available must beFalse
-//      } reduce (_ and _))
-//
-//      clusterManager ! NodeChildrenChanged(availabilityNode)
-//
-//      val res2 = (nodesChangedCount must eventually(be_==(1))) and
-//      (nodesReceived.size must be_==(3)) and
-//      (nodesReceived must haveTheSameElementsAs(nodes))
-//      (nodesReceived map { n =>
-//        if (n.id == 2) n.available must beFalse else n.available must beTrue
-//      } reduce (_ and _))
-//
-//      res1 and res2 and (there were two(mockZooKeeper).getChildren(availabilityNode, true))
-      pending
+    def updatesAvailabilityAndNotifiesListeners = this {
+      val membership = new ArrayList[String]
+      membership.add("1")
+      membership.add("2")
+      membership.add("3")
+
+      val availability = new ArrayList[String]
+      availability.add("2")
+
+      val newAvailability = new ArrayList[String]
+      newAvailability.add("1")
+      newAvailability.add("3")
+
+      val nodes = Array(Node(1, "localhost:31313", true, Set(1, 2)),
+        Node(2, "localhost:31314", true, Set(2, 3)), Node(3, "localhost:31315", false, Set(2, 3)))
+
+      mockZooKeeper.getChildren(membershipNode, true) returns membership
+      nodes.foreach { node =>
+        mockZooKeeper.getData("%s/%d".format(membershipNode, node.id), false, null) returns Node.nodeToByteArray(node)
+      }
+      mockZooKeeper.getChildren(availabilityNode, true) returns availability thenReturns newAvailability
+
+      clusterManager ! Connected
+
+      val res1 = (nodesReceived.size must eventually(be_==(3))) and
+      (nodesReceived must haveTheSameElementsAs(nodes)) and
+      (nodesReceived map { n =>
+        if (n.id == 2) n.available must beTrue else n.available must beFalse
+      } reduce (_ and _))
+
+      clusterManager ! NodeChildrenChanged(availabilityNode)
+
+      val res2 = (nodesChangedCount must eventually(be_==(1))) and
+      (nodesReceived.size must be_==(3)) and
+      (nodesReceived must haveTheSameElementsAs(nodes))
+      (nodesReceived map { n =>
+        if (n.id == 2) n.available must beFalse else n.available must beTrue
+      } reduce (_ and _))
+
+      res1 and res2 and (there were two(mockZooKeeper).getChildren(availabilityNode, true))
     }
 
-    def doNothingWithAvailabilityChangeWhenDisconnected =  {
-//      clusterManager ! NodeChildrenChanged(availabilityNode)
-//      nodesChangedCount must eventually(be_==(0))
-      pending
+    def doNothingWithAvailabilityChangeWhenDisconnected =  this {
+      clusterManager ! NodeChildrenChanged(availabilityNode)
+      nodesChangedCount must eventually(be_==(0))
     }
 
-    def doNothingWithMembershipChangeWhenDisconnected =  {
-//      clusterManager ! NodeChildrenChanged(membershipNode)
-//      nodesChangedCount must eventually(be_==(0))
-      pending
+    def doNothingWithMembershipChangeWhenDisconnected =  this {
+      clusterManager ! NodeChildrenChanged(membershipNode)
+      nodesChangedCount must eventually(be_==(0))
     }
 
     def updatesNodesAndNotifies = this {
-//      val membership = new ArrayList[String]
-//      membership.add("1")
-//      membership.add("2")
-//
-//      val newMembership = new ArrayList[String]
-//      newMembership.add("1")
-//      newMembership.add("2")
-//      newMembership.add("3")
-//
-//      val updatedNodes = Array(Node(1, "localhost:31313", true, Set(1, 2)),
-//        Node(2, "localhost:31314", true, Set(2, 3)), Node(3, "localhost:31315", false, Set(2, 3)))
-//      val nodes = updatedNodes.slice(0, 2)
-//
-//      mockZooKeeper.getChildren(membershipNode, true) returns membership thenReturns newMembership
-//      updatedNodes.foreach { node =>
-//        mockZooKeeper.getData("%s/%d".format(membershipNode, node.id), false, null) returns Node.nodeToByteArray(node)
-//      }
-//      mockZooKeeper.getChildren(availabilityNode, true) returns membership
-//
-//      clusterManager ! Connected
-//
-//      val res1 = (nodesReceived.size must eventually(be_==(2))) and (nodesReceived must haveTheSameElementsAs(nodes))
-//
-//      clusterManager ! NodeChildrenChanged(membershipNode)
-//
-//      val res2 = (nodesChangedCount must eventually(be_==(1))) and
-//      (nodesReceived.size must be_==(3)) and
-//      (nodesReceived must haveTheSameElementsAs(updatedNodes))
-//
-//      res1 and res2 and (got {
-//        two(mockZooKeeper).getChildren(availabilityNode, true)
-//        two(mockZooKeeper).getChildren(membershipNode, true)
-//      })
-      pending
+      val membership = new ArrayList[String]
+      membership.add("1")
+      membership.add("2")
+
+      val newMembership = new ArrayList[String]
+      newMembership.add("1")
+      newMembership.add("2")
+      newMembership.add("3")
+
+      val updatedNodes = Array(Node(1, "localhost:31313", true, Set(1, 2)),
+        Node(2, "localhost:31314", true, Set(2, 3)), Node(3, "localhost:31315", false, Set(2, 3)))
+      val nodes = updatedNodes.slice(0, 2)
+
+      mockZooKeeper.getChildren(membershipNode, true) returns membership thenReturns newMembership
+      updatedNodes.foreach { node =>
+        mockZooKeeper.getData("%s/%d".format(membershipNode, node.id), false, null) returns Node.nodeToByteArray(node)
+      }
+      mockZooKeeper.getChildren(availabilityNode, true) returns membership
+
+      clusterManager ! Connected
+
+      val res1 = (nodesReceived.size must eventually(be_==(2))) and (nodesReceived must haveTheSameElementsAs(nodes))
+
+      clusterManager ! NodeChildrenChanged(membershipNode)
+
+      val res2 = (nodesChangedCount must eventually(be_==(1))) and
+      (nodesReceived.size must be_==(3)) and
+      (nodesReceived must haveTheSameElementsAs(updatedNodes))
+
+      res1 and res2 and (got {
+        two(mockZooKeeper).getChildren(availabilityNode, true)
+        two(mockZooKeeper).getChildren(membershipNode, true)
+      })
     }
 
-    def handlesNodeIsRemoved =  {
-//      val membership = new ArrayList[String]
-//      membership.add("1")
-//      membership.add("2")
-//      membership.add("3")
-//
-//      val newMembership = new ArrayList[String]
-//      newMembership.add("1")
-//      newMembership.add("3")
-//
-//      val nodes = Array(Node(1, "localhost:31313", true, Set(1, 2)),
-//        Node(2, "localhost:31314", true, Set(2, 3)), Node(3, "localhost:31315", false, Set(2, 3)))
-//
-//      mockZooKeeper.getChildren(membershipNode, true) returns membership thenReturns newMembership
-//      nodes.foreach { node =>
-//        mockZooKeeper.getData("%s/%d".format(membershipNode, node.id), false, null) returns Node.nodeToByteArray(node)
-//      }
-//      mockZooKeeper.getChildren(availabilityNode, true) returns membership
-//
-//      clusterManager ! Connected
-//
-//      val res1 = (nodesReceived.size must eventually(be_==(3))) and
-//      (nodesReceived must haveTheSameElementsAs(nodes)) and
-//      (nodesReceived map { _.available must beTrue } reduce (_ and _))
-//
-//      clusterManager ! NodeChildrenChanged(membershipNode)
-//
-//      val res2 = nodesChangedCount must eventually(be_==(1))
-//      nodesReceived.size must be_==(2)
-//      nodesReceived must haveTheSameElementsAs(List(nodes(0), nodes(2)))
-//
-//      res1 and res2 and (there were two(mockZooKeeper).getChildren(membershipNode, true))
-      pending
+    def handlesNodeIsRemoved = this {
+      val membership = new ArrayList[String]
+      membership.add("1")
+      membership.add("2")
+      membership.add("3")
+
+      val newMembership = new ArrayList[String]
+      newMembership.add("1")
+      newMembership.add("3")
+
+      val nodes = Array(Node(1, "localhost:31313", true, Set(1, 2)),
+        Node(2, "localhost:31314", true, Set(2, 3)), Node(3, "localhost:31315", false, Set(2, 3)))
+
+      mockZooKeeper.getChildren(membershipNode, true) returns membership thenReturns newMembership
+      nodes.foreach { node =>
+        mockZooKeeper.getData("%s/%d".format(membershipNode, node.id), false, null) returns Node.nodeToByteArray(node)
+      }
+      mockZooKeeper.getChildren(availabilityNode, true) returns membership
+
+      clusterManager ! Connected
+
+      val res1 = (nodesReceived.size must eventually(be_==(3))) and
+      (nodesReceived must haveTheSameElementsAs(nodes)) and
+      (nodesReceived map { _.available must beTrue } reduce (_ and _))
+
+      clusterManager ! NodeChildrenChanged(membershipNode)
+
+      val res2 = nodesChangedCount must eventually(be_==(1))
+      nodesReceived.size must be_==(2)
+      nodesReceived must haveTheSameElementsAs(List(nodes(0), nodes(2)))
+
+      res1 and res2 and (there were two(mockZooKeeper).getChildren(membershipNode, true))
     }
 
-    def handlesNodeIsRemoved2 =  {
-//      val membership = new ArrayList[String]
-//      membership.add("1")
-//      membership.add("2")
-//      membership.add("3")
-//
-//      val newMembership = new ArrayList[String]
-//      newMembership.add("1")
-//      newMembership.add("3")
-//
-//      val nodes = Array(Node(1, "localhost:31313", true, Set(1, 2)),
-//        Node(2, "localhost:31314", true, Set(2, 3)), Node(3, "localhost:31315", false, Set(2, 3)))
-//
-//      mockZooKeeper.getChildren(membershipNode, true) returns membership thenReturns newMembership
-//      nodes.foreach { node =>
-//        mockZooKeeper.getData("%s/%d".format(membershipNode, node.id), false, null) returns Node.nodeToByteArray(node)
-//      }
-//      mockZooKeeper.getChildren(availabilityNode, true) returns membership
-//
-//      clusterManager ! Connected
-//
-//      val res1 = (nodesReceived.size must eventually(be_==(3))) and
-//      (nodesReceived must haveTheSameElementsAs(nodes)) and
-//      (nodesReceived map { _.available must beTrue } reduce (_ and _))
-//
-//      clusterManager ! NodeChildrenChanged(membershipNode)
-//
-//      val res2 = (nodesChangedCount must eventually(be_==(1))) and
-//      (nodesReceived.size must be_==(2)) and
-//      (nodesReceived must haveTheSameElementsAs(List(nodes(0), nodes(2))))
-//
-//      res1 and res2 and (there were two(mockZooKeeper).getChildren(membershipNode, true))
-      pending
+    def handlesNodeIsRemoved2 =  this {
+      val membership = new ArrayList[String]
+      membership.add("1")
+      membership.add("2")
+      membership.add("3")
+
+      val newMembership = new ArrayList[String]
+      newMembership.add("1")
+      newMembership.add("3")
+
+      val nodes = Array(Node(1, "localhost:31313", true, Set(1, 2)),
+        Node(2, "localhost:31314", true, Set(2, 3)), Node(3, "localhost:31315", false, Set(2, 3)))
+
+      mockZooKeeper.getChildren(membershipNode, true) returns membership thenReturns newMembership
+      nodes.foreach { node =>
+        mockZooKeeper.getData("%s/%d".format(membershipNode, node.id), false, null) returns Node.nodeToByteArray(node)
+      }
+      mockZooKeeper.getChildren(availabilityNode, true) returns membership
+
+      clusterManager ! Connected
+
+      val res1 = (nodesReceived.size must eventually(be_==(3))) and
+      (nodesReceived must haveTheSameElementsAs(nodes)) and
+      (nodesReceived map { _.available must beTrue } reduce (_ and _))
+
+      clusterManager ! NodeChildrenChanged(membershipNode)
+
+      val res2 = (nodesChangedCount must eventually(be_==(1))) and
+      (nodesReceived.size must be_==(2)) and
+      (nodesReceived must haveTheSameElementsAs(List(nodes(0), nodes(2))))
+
+      res1 and res2 and (there were two(mockZooKeeper).getChildren(membershipNode, true))
     }
 
-    def stopHandlingEventsOnShutdown =  {
-      pending
-////      doNothing.when(mockZooKeeper).close
-//      var callCount = 0
-//      def countedZkf(connectString: String, sessionTimeout: Duration, watcher: Watcher) = {
-//        callCount += 1
-//        mockZooKeeper
-//      }
-//
-//      val zkm = actorOf(new ZooKeeperClusterManager("", new Duration(0), "")(countedZkf _))
-//      zkm.start
-////      clusterManager ! Shutdown
-////      clusterManager ! Connected
-//
-//      Thread sleep 10
-//      val res = (callCount must eventually(be_==(1))) and (there was one(mockZooKeeper).close)
-//
-//      zkm ! Shutdown
-//      res
+    def stopHandlingEventsOnShutdown = this {
+      doNothing.when(mockZooKeeper).close()
+      var callCount = 0
+      def countedZkf(connectString: String, sessionTimeout: Duration, watcher: Watcher) = {
+        callCount += 1
+        mockZooKeeper
+      }
+
+      val zkm = actorOf(new ZooKeeperClusterManager("", new Duration(0), "test")(countedZkf _))
+      zkm.start
+      clusterManager ! Shutdown
+      registry.actorFor[ZooKeeperClusterManager] foreach { _ ! Connected }
+      sleep -> 10.millis
+
+      val res = (callCount must eventually(be_==(1))) and (there was one(mockZooKeeper).close)
+
+      zkm ! Shutdown
+      res
     }
 
     val node = Node(1, "localhost:31313", false, Set(1, 2))
 
-    def throwsClusterDisconnectedForAddNode = {
-//      val ex = (clusterManager ? AddNode(node)).as[ClusterManagerResponse].get.exception
-//
-//      ex must beSome[ClusterException].which(_ must haveClass[ClusterDisconnectedException])
-      pending
+    def throwsClusterDisconnectedForAddNode = this {
+      val ex = (clusterManager ? AddNode(node)).as[ClusterManagerResponse].get.exception
+
+      ex must beSome[ClusterException].which(_ must haveClass[ClusterDisconnectedException])
     }
 
-    def throwsInvalidNodeForAddNode = {
-//      val path = membershipNode + "/1"
-//      mockZooKeeper.exists(path, false) returns mock[Stat]
-//
-//      clusterManager ! Connected
-//      val ex = (clusterManager ? AddNode(node)).as[ClusterManagerResponse].get.exception
-//
-//      (ex must beSome[ClusterException].which(_ must haveClass[InvalidNodeException])) and
-//      (there was one(mockZooKeeper).exists(path, false))
-      pending
+    def throwsInvalidNodeForAddNode = this {
+      val path = membershipNode + "/1"
+      mockZooKeeper.exists(path, false) returns mock[Stat]
+
+      clusterManager ! Connected
+      val ex = (clusterManager ? AddNode(node)).as[ClusterManagerResponse].get.exception
+
+      (ex must beSome[ClusterException].which(_ must haveClass[InvalidNodeException])) and
+      (there was one(mockZooKeeper).exists(path, false))
     }
 
-    def addsNode =  {
-//      val path = membershipNode + "/1"
-//      mockZooKeeper.exists(path, false) returns null
-//      mockZooKeeper.create(path, node, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT) returns path
-//
-//      clusterManager ! Connected
-//      val ex = (clusterManager ? AddNode(node)).as[ClusterManagerResponse].get.exception
-//
-//      ex must beNone and (got {
-//        one(mockZooKeeper).exists(path, false)
-//        one(mockZooKeeper).create(path, node, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT)
-//      })
-      pending
+    def addsNode =  this {
+      val path = membershipNode + "/1"
+      mockZooKeeper.exists(path, false) returns null
+      mockZooKeeper.create(path, node, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT) returns path
+
+      clusterManager ! Connected
+      val ex = (clusterManager ? AddNode(node)).as[ClusterManagerResponse].get.exception
+
+      ex must beNone and (got {
+        one(mockZooKeeper).exists(path, false)
+        one(mockZooKeeper).create(path, node, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT)
+      })
     }
 
     def notifiesForAddNode = this {
-//      clusterManager ! Connected
-//      (clusterManager ? AddNode(node)).as[Any]
-//
-//      nodesChangedCount must eventually(be_==(1)) and
-//      (nodesReceived.size must be_==(1)) and
-//      (nodesReceived must contain(node))
-      pending
+      clusterManager ! Connected
+      (clusterManager ? AddNode(node)).as[Any].get
+
+      nodesChangedCount must be_==(1).eventually and
+      (nodesReceived.size must be_==(1)) and
+      (nodesReceived must contain(node))
     }
 
-    def throwsClusterDisconnectedForRemoveNode = {
-      pending
+    def throwsClusterDisconnectedForRemoveNode = this {
+      val ex = (clusterManager ? RemoveNode(node.id)).as[ClusterManagerResponse].get.exception
+
+      ex must beSome[ClusterException].which(_ must haveClass[ClusterDisconnectedException])
     }
 
-    def doNothingIfNodeDoesNotExist = {
-      pending
+    def doNothingIfNodeDoesNotExist = this {
+      mockZooKeeper.exists(membershipNode + "/1", false) returns null
+      
+      clusterManager ! Connected
+      ((clusterManager ? RemoveNode(node.id)).as[ClusterManagerResponse].get.exception must beNone) and
+      (there was one(mockZooKeeper).exists(membershipNode + "/1", false))
     }
 
-    def removesNode = {
-      pending
+    def removesNode = this {
+      val path = membershipNode + "/1"
+      
+      mockZooKeeper.exists(path, false) returns mock[Stat]
+      doNothing.when(mockZooKeeper).delete(path, -1)
+
+      clusterManager ! Connected
+      ((clusterManager ? RemoveNode(1)).as[ClusterManagerResponse].get.exception must beNone) and
+      (there was one(mockZooKeeper).delete(path, -1))
     }
 
-    def notifiesForRemoveNode = {
-      pending
+    def notifiesForRemoveNode = this {
+      val membership = new ArrayList[String]
+      membership.add("1")
+      membership.add("2")
+      membership.add("3")
+
+      val availability = membership.clone.asInstanceOf[ArrayList[String]]
+      availability.remove(2)
+
+      val nodes = Array(Node(1, "localhost:31313", true, Set(1, 2)),
+        Node(2, "localhost:31314", false, Set(2, 3)), Node(3, "localhost:31315", true, Set(2, 3)))
+
+      mockZooKeeper.getChildren(membershipNode, true) returns membership
+      nodes.foreach { node =>
+        mockZooKeeper.getData("%s/%d".format(membershipNode, node.id), false, null) returns Node.nodeToByteArray(node)
+      }
+      mockZooKeeper.getChildren(availabilityNode, true) returns availability
+
+      clusterManager ! Connected
+      (clusterManager ? RemoveNode(2)).get
+
+      nodesReceived.size must eventually(be_==(2))
+      nodesReceived must haveTheSameElementsAs(Array(nodes(0), nodes(2)))
     }
 
-    def throwsClusterDisconnectedForMarkAvailable = {
-      pending
+    def throwsClusterDisconnectedForMarkAvailable = this {
+      val r = (clusterManager ? MarkNodeAvailable(1)).as[ClusterManagerResponse].get.exception
+      r must beSome[ClusterException].which(_ must haveClass[ClusterDisconnectedException])
     }
 
-    def addsNodeForAvailable = {
-      pending
+    def addsNodeForAvailable = this {
+      val znodes = List(rootNode, membershipNode, availabilityNode)
+      znodes.foreach(mockZooKeeper.exists(_, false) returns mock[Stat])
+
+      val path = availabilityNode + "/1"
+
+      mockZooKeeper.exists(path, false) returns null
+      mockZooKeeper.create(path, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL) returns path
+
+      clusterManager ! Connected
+
+      ((clusterManager ? MarkNodeAvailable(1)).as[ClusterManagerResponse].get.exception must beNone) and
+      (got {
+        one(mockZooKeeper).exists(path, false)
+        one(mockZooKeeper).create(path, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL)
+      })
     }
 
-    def doNothingIfAlreadyExists = {
-      pending
+    def doNothingIfAlreadyExists = this {
+      val znodes = List(rootNode, membershipNode, availabilityNode)
+      znodes.foreach(mockZooKeeper.exists(_, false) returns mock[Stat])
+
+      val path = availabilityNode + "/1"
+
+      mockZooKeeper.exists(path, false) returns mock[Stat]
+      mockZooKeeper.create(path, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL) returns path
+
+      clusterManager ! Connected
+      ((clusterManager ? MarkNodeAvailable(1)).as[ClusterManagerResponse].get.exception must beNone) and
+      (there was one(mockZooKeeper).exists(path, false)) and
+      (there was no(mockZooKeeper).create(path, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL))
     }
 
-    def notifiesForAvailable = {
-      pending
+    def notifiesForAvailable = this {
+      val membership = new ArrayList[String]
+      membership.add("1")
+      membership.add("2")
+      membership.add("3")
+
+      val availability = membership.clone.asInstanceOf[ArrayList[String]]
+      availability.remove(2)
+
+      val nodes = Array(Node(1, "localhost:31313", true, Set(1, 2)),
+        Node(2, "localhost:31314", false, Set(2, 3)), Node(3, "localhost:31315", true, Set(2, 3)))
+
+      mockZooKeeper.getChildren(membershipNode, true) returns membership
+      nodes.foreach { node =>
+        mockZooKeeper.getData("%s/%d".format(membershipNode, node.id), false, null) returns Node.nodeToByteArray(node)
+      }
+      mockZooKeeper.getChildren(availabilityNode, true) returns availability
+
+      clusterManager ! Connected
+
+      val res1 = nodesReceived.size must eventually(be_>(0)) and (nodesReceived map { node =>
+        if (node.id == 3) node.available must beFalse
+        else 1 must_== 1
+      } reduce (_ and _))
+
+      (clusterManager ? MarkNodeAvailable(3)).get
+
+      res1 and (nodesReceived map { node =>
+        if (node.id == 3) node.available must beTrue
+        else 1 must_== 1
+      } reduce (_ and _))
     }
 
-    def throwsClusterDisconnectedForMarkUnavailable = {
-      pending
+    def throwsClusterDisconnectedForMarkUnavailable = this {
+      val r = (clusterManager ? MarkNodeUnavailable(1)).as[ClusterManagerResponse].get.exception
+      r must beSome[ClusterException].which(_ must haveClass[ClusterDisconnectedException])
     }
 
-    def removesNodeForUnavailable = {
-      pending
+    def removesNodeForUnavailable = this {
+      mockZooKeeper.exists(availabilityNode + "/1", false) returns mock[Stat]
+
+      clusterManager ! Connected
+      ((clusterManager ? MarkNodeUnavailable(1)).as[ClusterManagerResponse].get.exception must beNone) and
+      (there was one(mockZooKeeper).exists(availabilityNode + "/1", false))
     }
 
-    def doNothingIfDoesNotExist = {
-//      val path = availabilityNode + "/1"
-//
-//      mockZooKeeper.exists(path, false) returns mock[Stat]
-//
-//      //doNothing.when(mockZooKeeper).delete(path, -1)
-//
-//      clusterManager ! Connected
-//      ((clusterManager ? MarkNodeUnavailable(1)).as[ClusterManagerResponse].get.exception must beNone) and
-//      (there was one(mockZooKeeper).delete(path, -1))
-      pending
+
+    def doNothingIfDoesNotExist = this {
+      val path = availabilityNode + "/1"
+
+      mockZooKeeper.exists(path, false) returns mock[Stat]
+
+      doNothing.when(mockZooKeeper).delete(path, -1)
+
+      clusterManager ! Connected
+      ((clusterManager ? MarkNodeUnavailable(1)).as[ClusterManagerResponse].get.exception must beNone) and
+      (there was one(mockZooKeeper).delete(path, -1))
     }
 
-    def notifiesForUnavailable = {
-//      val membership = new ArrayList[String]
-//      membership.add("1")
-//      membership.add("2")
-//      membership.add("3")
-//
-//      val availability = membership.clone.asInstanceOf[ArrayList[String]]
-//      availability.remove(2)
-//
-//      val nodes = Array(Node(1, "localhost:31313", true, Set(1, 2)),
-//      Node(2, "localhost:31314", false, Set(2, 3)), Node(3, "localhost:31315", true, Set(2, 3)))
-//
-//      mockZooKeeper.getChildren(membershipNode, true) returns membership
-//      nodes.foreach { node =>
-//        mockZooKeeper.getData("%s/%d".format(membershipNode, node.id), false, null) returns Node.nodeToByteArray(node)
-//      }
-//      mockZooKeeper.getChildren(availabilityNode, true) returns availability
-//
-//      clusterManager ! Connected
-//
-//      val res1 = (nodesReceived.size must eventually(be_>(0))) //and
-//      (nodesReceived.map({ node =>
-//        if (node.id == 1) node.available must beTrue
-//        else success
-//      }).reduce(_ and _))
+    def notifiesForUnavailable = this {
+      val membership = new ArrayList[String]
+      membership.add("1")
+      membership.add("2")
+      membership.add("3")
 
-//      (clusterManager ? MarkNodeUnavailable(1)).as[Any]
-//      Thread sleep 10
+      val availability = membership.clone.asInstanceOf[ArrayList[String]]
+      availability.remove(2)
 
-//      res1 and (nodesReceived map { node =>
-//        if (node.id == 1) node.available must beFalse
-//        else success
-//      } reduce (_ and _))
-//      res1
-      pending
+      val nodes = Array(Node(1, "localhost:31313", true, Set(1, 2)),
+      Node(2, "localhost:31314", false, Set(2, 3)), Node(3, "localhost:31315", true, Set(2, 3)))
+
+      mockZooKeeper.getChildren(membershipNode, true) returns membership
+      nodes.foreach { node =>
+        mockZooKeeper.getData("%s/%d".format(membershipNode, node.id), false, null) returns Node.nodeToByteArray(node)
+      }
+      mockZooKeeper.getChildren(availabilityNode, true) returns availability
+
+      clusterManager ! Connected
+
+      val res1 = (nodesReceived.size must be_>(0).eventually) and (nodesReceived map { node =>
+        if (node.id == 1) node.available must beTrue
+        else 1 must_== 1
+      } reduce (_ and _))
+
+      (clusterManager ? MarkNodeUnavailable(1)).as[Any]
+      sleep -> 10.millis
+
+      (res1 and (nodesReceived map { node =>
+        if (node.id == 1) node.available must beFalse
+        else 1 must_== 1
+      } reduce (_ and _)))
     }
 
   }
