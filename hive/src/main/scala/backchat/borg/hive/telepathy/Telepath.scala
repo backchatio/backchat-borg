@@ -10,9 +10,26 @@ import java.util.concurrent.TimeUnit
 import akka.zeromq._
 import akka.config.Supervision._
 
-class BorgZMessageDeserializer extends Deserializer[BorgMessage] {
-  def apply(frames: Seq[Frame]) = BorgMessage(frames.last.payload)
+trait FromZMQMessage[TMessage] {
+  def fromZMQMessage(msg: ZMQMessage): TMessage
 }
+
+trait ToZMQMessage[TMessage] {
+  def toZMQMessage(msg: TMessage): ZMQMessage
+}
+
+trait ZMQMessageFormat[TMessage] extends FromZMQMessage[BorgMessage] with ToZMQMessage[BorgMessage]
+
+class BorgZMQMessageSerializer extends ZMQMessageFormat[BorgMessage] with Logging {
+
+  def fromZMQMessage(msg: ZMQMessage) = {
+    logger debug "Received [%d] frames".format(msg.frames.size)
+    BorgMessage(msg.frames.last.payload)
+  }
+
+  def toZMQMessage(msg: BorgMessage) = ZMQMessage(msg.toProtobuf)
+}
+
 
 trait Telepath extends Actor with Logging {
 
@@ -21,13 +38,11 @@ trait Telepath extends Actor with Logging {
 
   lazy val context = ZeroMQ.newContext()
 
-  protected def newSocket(socketType: SocketType.Value, timeout: Duration = 100.millis) = {
-    val timeo = akka.util.Duration(timeout.getMillis, TimeUnit.MILLISECONDS)
-    val params = SocketParameters(context, socketType, Some(self), deserializer, timeo)
+  protected def newSocket(socketType: SocketType.Value, socketTimeout: Duration = 100.millis) = {
+    val timeo = akka.util.Duration(socketTimeout.getMillis, TimeUnit.MILLISECONDS)
+    val params = SocketParameters(context, socketType, Some(self), pollTimeoutDuration = timeo)
     ZeroMQ.newSocket(params, Some(self), self.dispatcher)
   }
-
-  lazy val deserializer = new BorgZMessageDeserializer
 
 }
 

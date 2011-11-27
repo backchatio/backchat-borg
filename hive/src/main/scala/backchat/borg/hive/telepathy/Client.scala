@@ -3,15 +3,18 @@ package borg
 package hive
 package telepathy
 
+import akka.actor._
 import akka.zeromq._
-import akka.actor.ActorRef
-import telepathy.HiveRequests.Tell
+import collection.mutable
+import akka.dispatch.{CompletableFuture, Future}
+import telepathy.Messages.{Reply, Ask, Tell}
 
 case class TelepathClientConfig(server: TelepathAddress, listener: Option[ActorRef] = None)
 
 class Client(config: TelepathClientConfig) extends Telepath {
 
   lazy val socket = newSocket(SocketType.Dealer)
+  var activeRequests = Map.empty[Uuid, CompletableFuture[Any]]
 
   override def preStart() {
     self ! 'init
@@ -26,9 +29,21 @@ class Client(config: TelepathClientConfig) extends Telepath {
       logger debug "enqueuing a message to a server"
       socket ! serialize(m)
     }
-    case m: Request => {
+    case m: Ask => {
       logger debug "Sending a request to a server"
-      socket ! serialize(m)
+      self.senderFuture foreach { fut =>
+        activeRequests += m.ccid -> fut
+        socket ! serialize(m)
+      }
+    }
+    case m: ZMQMessage => deserialize(m) match {
+      case rep: Reply => {
+        logger debug "processing a reply: %s".format(rep)
+        activeRequests get rep.ccid foreach { fut =>
+          logger debug "completing future"
+          fut completeWithResult rep.payload
+        }
+      }
     }
     case Connecting => {
       logger debug "Connecting to server"
@@ -39,5 +54,7 @@ class Client(config: TelepathClientConfig) extends Telepath {
     }
   }
   
-  private def serialize(msg: BorgMessageWrapper) = Send(Seq(Frame(msg.unwrapped.toBytes)))
+  val serializer = new BorgZMQMessageSerializer
+  private def deserialize(msg: ZMQMessage) = Messages(serializer.fromZMQMessage(msg))
+  private def serialize(msg: BorgMessageWrapper) = serializer.toZMQMessage(msg.unwrapped)
 }

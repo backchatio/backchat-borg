@@ -10,7 +10,6 @@ import akka.config.Supervision._
 
 package object telepathy {
 
-  def newCcid = new Uuid
   val telepathyDispatcher = Dispatchers.newExecutorBasedEventDrivenDispatcher("borg-telepathy-dispatcher").build
 
   private val supervisor =

@@ -13,7 +13,7 @@ case class SocketParameters(
   context: Context, 
   socketType: SocketType, 
   listener: Option[ActorRef] = None, 
-  deserializer: Deserializer[_] = new ZMQMessageDeserializer,
+  deserializer: Deserializer = new ZMQMessageDeserializer,
   pollTimeoutDuration: Duration = 100 millis
 )
 

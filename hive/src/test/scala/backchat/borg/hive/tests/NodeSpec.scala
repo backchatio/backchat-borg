@@ -3,7 +3,6 @@ package hive
 package tests
 
 import org.specs2.Specification
-import protos.BorgProtos
 
 class NodeSpec extends Specification { def is =
 
@@ -20,7 +19,7 @@ class NodeSpec extends Specification { def is =
     "has the same hashcodes for equal nodes with different extra content" ! context.checkHashCodes ^ end
   
   def serializeCorrectly = {
-    val builder = BorgProtos.Node.newBuilder
+    val builder = Protos.Node.newBuilder
     builder.setId(1)
     builder.setUrl("localhost:31313")
     builder.addPartition(0).addPartition(1)
@@ -31,7 +30,7 @@ class NodeSpec extends Specification { def is =
   }
 
   def deserializeCorrectly = {
-    val builder = BorgProtos.Node.newBuilder
+    val builder = Protos.Node.newBuilder
     builder.setId(1)
     builder.setUrl("localhost:31313")
     builder.addPartition(0).addPartition(1)

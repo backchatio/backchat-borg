@@ -6,10 +6,10 @@ package akka.zeromq
 case class Frame(payload: Seq[Byte])
 object Frame { def apply(s: String): Frame = Frame(s.getBytes) }
 
-trait Deserializer[T] {
-  def apply(frames: Seq[Frame]): T
+trait Deserializer {
+  def apply(frames: Seq[Frame]): Any
 }
 
-class ZMQMessageDeserializer extends Deserializer[ZMQMessage] {
-  def apply(frames: Seq[Frame]): ZMQMessage = ZMQMessage(frames)
+class ZMQMessageDeserializer extends Deserializer {
+  def apply(frames: Seq[Frame]) = ZMQMessage(frames)
 }

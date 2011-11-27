@@ -2,7 +2,6 @@ package backchat.borg
 package hive
 
 import com.google.protobuf.InvalidProtocolBufferException
-import protos.BorgProtos
 
 /**
  * The <code>Node</code> companion object. Provides factory methods and implicits.
@@ -23,10 +22,10 @@ object Node {
     import collection.JavaConversions._
 
     try {
-      val node = BorgProtos.Node.newBuilder.mergeFrom(bytes).build
+      val node = Protos.Node.newBuilder.mergeFrom(bytes).build
       val partitions = node.getPartitionList.asInstanceOf[java.util.List[Int]].foldLeft(Set.empty[Int])(_ + _)
 
-      Node(node.getId, node.getUrl, available, partitions, Option(node.getReportingUrl), Option(node.getPubsubUrl))
+      Node(node.getId, node.getUrl, available, partitions, Option(node.getStateUrl), Option(node.getPubsubUrl))
     } catch {
       case ex: InvalidProtocolBufferException ⇒ throw new InvalidNodeException("Error deserializing node", ex)
     }
@@ -40,11 +39,11 @@ object Node {
    * @return the serialized <code>Node</code>
    */
   implicit def nodeToByteArray(node: Node): Array[Byte] = {
-    val builder = BorgProtos.Node.newBuilder
+    val builder = Protos.Node.newBuilder
 
     builder.setId(node.id).setUrl(node.url)
     node.partitionIds.foreach(builder.addPartition(_))
-    node.stateUrl foreach builder.setReportingUrl
+    node.stateUrl foreach builder.setStateUrl
     node.pubsubUrl foreach  builder.setPubsubUrl
 
     builder.build.toByteArray
