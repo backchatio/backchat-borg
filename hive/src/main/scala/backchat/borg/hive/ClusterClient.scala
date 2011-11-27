@@ -177,6 +177,30 @@ trait ClusterClient extends Logging {
     }
   }
 
+  def addService(name: String, nodeId: Int) {
+    handleClusterManagerResponse {
+      (clusterManager ? ClusterManagerMessages.AddService(name, nodeId)).get
+    }
+  }
+
+  def removeService(name: String, nodeId: Int) {
+    handleClusterManagerResponse {
+      (clusterManager ? ClusterManagerMessages.RemoveService(name, nodeId)).get
+    }
+  }
+
+  def markServiceActive(name: String, nodeId: Int) {
+    handleClusterManagerResponse {
+      (clusterManager ? ClusterManagerMessages.MarkServiceActive(name, nodeId)).get
+    }
+  }
+
+  def markServiceInactive(name: String, nodeId: Int) {
+    handleClusterManagerResponse {
+      (clusterManager ? ClusterManagerMessages.MarkServiceInactive(name, nodeId)).get
+    }
+  }
+
   /**
    * Registers a <code>ClusterListener</code> with the <code>ClusterClient</code> to receive cluster events.
    *

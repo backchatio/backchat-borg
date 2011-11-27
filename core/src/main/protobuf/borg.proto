@@ -1,0 +1,31 @@
+package backchat.borg;
+
+option optimize_for = SPEED;
+option java_package = "backchat.borg";
+option java_outer_classname = "Protos";
+
+message BorgPayload {
+  required string action = 1;
+  optional bytes data = 2;
+  optional bytes meta = 3;
+}
+
+message BorgMessage {
+
+  enum MessageType {
+    SYSTEM = 0;
+    FIRE_FORGET = 1;
+    REQUEST_REPLY = 2;
+    PUBSUB = 3;
+  }
+
+  required string ccid = 1;
+  required MessageType message_type = 2;
+  required string target = 3;
+  optional BorgPayload payload = 4;
+
+  optional string sender = 5;
+
+}
+
+

@@ -44,7 +44,7 @@ object Node {
 
     builder.setId(node.id).setUrl(node.url)
     node.partitionIds.foreach(builder.addPartition(_))
-    node.reportingUrl foreach builder.setReportingUrl
+    node.stateUrl foreach builder.setReportingUrl
     node.pubsubUrl foreach  builder.setPubsubUrl
 
     builder.build.toByteArray
@@ -60,7 +60,7 @@ object Node {
  * @param partitions the partitions for which the node can handle requests
  * @param reportingUrl
  */
-final case class Node(id: Int, url: String, available: Boolean, partitionIds: Set[Int] = Set.empty, reportingUrl: Option[String] = None, pubsubUrl: Option[String] = None) {
+final case class Node(id: Int, url: String, available: Boolean, partitionIds: Set[Int] = Set.empty, stateUrl: Option[String] = None, pubsubUrl: Option[String] = None) {
   require(url.isNotNull, "url must not be null")
   require(partitionIds.isNotNull, "partitions must not be null")
 
@@ -71,5 +71,5 @@ final case class Node(id: Int, url: String, available: Boolean, partitionIds: Se
     case _          ⇒ false
   }
 
-  override def toString = "Node(%d,%s,[%s],%b)".format(id, url, partitionIds.mkString(","), available, reportingUrl, pubsubUrl)
+  override def toString = "Node(%d,%s,[%s],%b)".format(id, url, partitionIds.mkString(","), available, stateUrl, pubsubUrl)
 }

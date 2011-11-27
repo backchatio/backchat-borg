@@ -245,7 +245,6 @@ trait ZooKeeperClusterManagerComponent extends ClusterManagerComponent {
 
     private def verifyZooKeeperStructure(zk: ZooKeeper) {
       logger.debug("Verifying ZooKeeper structure...")
-
       
       Nodes foreach { path ⇒
         ignoringIf(_.code() == KeeperException.Code.NODEEXISTS) {
@@ -253,8 +252,7 @@ trait ZooKeeperClusterManagerComponent extends ClusterManagerComponent {
           if (zk.exists(path, false).isNull) {
             logger.debug("%s doesn't exist, creating".format(path))
             zk.create(path, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT)
-          }
-          ()
+          };()  // return Unit and save a cheerleader
         }
       }
     }

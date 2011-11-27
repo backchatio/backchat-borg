@@ -1,8 +1,8 @@
 package backchat.borg;
 
 option optimize_for = SPEED;
-option java_package = "backchat.borg.protos";
-option java_outer_classname = "BorgProtos";
+option java_package = "backchat.borg.hive";
+option java_outer_classname = "Protos";
 
 message BorgMessage {
   required sfixed64 request_id_msb = 1;
@@ -24,6 +24,14 @@ message Node {
   required int32 id = 1;
   required string url = 2;
   repeated int32 partition = 3;
-  optional string reporting_url = 4;
+  optional string state_url = 4;
   optional string pubsub_url = 5;
 }
+
+message Service {
+  required string name = 1;
+  required int32 nodeId = 2;
+  optional bytes data = 3;
+}
+
+

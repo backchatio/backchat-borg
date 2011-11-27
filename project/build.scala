@@ -19,13 +19,14 @@ object BackchatBorgBuild extends Build {
       description := "Provides the clustering and High-Availabillity for the backchat system"))
       aggregate(core, hive, cadence, samples, assimil))
 
-
-  lazy val core =  (Project("borg-core", file("core"), settings = commonSettings ++ Seq(
+  lazy val core =  (Project("borg-core", file("core"), settings = commonSettings ++ PB.protobufSettings ++ Seq(
     description := "The shared classes for the borg",
     ivyXML := <dependencies>
                 <exclude module="slf4j-log4j12" />
                 <exclude module="log4j" />
               </dependencies>,
+    unmanagedResourceDirectories in Compile <+= (sourceDirectory in PB.protobufConfig).identity,
+    javaSource in PB.protobufConfig <<= (sourceManaged in Compile).identity,
     libraryDependencies ++= Seq(
       "com.google.protobuf" % "protobuf-java" % "2.4.1",
       mojollyLibrary("core"),

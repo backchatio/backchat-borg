@@ -291,7 +291,7 @@ trait ClientBridge { parent: ZeroMqBridge ⇒
     case m: Request ⇒ {
       if (!self.senderFuture().isDefined) throw new RequestRequiresFutureException
       implicit val timeout = Actor.Timeout(akka.util.Duration(self.senderFuture().get.timeoutInNanos, TimeUnit.NANOSECONDS))
-      val requester = actorOf(new ZeroMqBridge.ReplyClient(m.ccid.toString, self.senderFuture().get)).start()
+      val requester = actorOf(new ZeroMqBridge.ReplyClient(m.ccid.toString, self.senderFuture.get)).start()
       sendToBridge(m.copy(sender = requester.id).toZMessage)
     }
     case m: Enqueue ⇒ sendToBridge(m.toZMessage)
