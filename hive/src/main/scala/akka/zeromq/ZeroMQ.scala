@@ -9,6 +9,7 @@ import akka.zeromq.SocketType._
 import akka.util.Duration
 import akka.util.duration._
 import org.joda.time.Period
+import backchat.borg.BorgMessage
 
 case class SocketParameters(
   context: Context, 
@@ -27,6 +28,7 @@ trait IntSocketOption extends SocketOption { type OptionType = Int }
 trait LongSocketOption extends SocketOption { type OptionType = Long }
 trait StringSocketOption extends SocketOption { type OptionType = String }
 trait BoolSocketOption extends SocketOption { type OptionType = Boolean }
+trait DeserializerSocketOption extends SocketOption { type OptionType = Deserializer }
 case class Linger(value: Long) extends LongSocketOption
 case class HWM(value: Long) extends LongSocketOption
 case class Affinity(value: Long) extends LongSocketOption
@@ -40,6 +42,7 @@ object Timeout {
   def apply(value: Period): Timeout = new Timeout(value.getMillis)
 }
 case class Timeout(value: Long) extends LongSocketOption
+case class MessageDeserializer(value: Deserializer) extends DeserializerSocketOption
 
 object ZeroMQ {
   def newContext(numIoThreads: Int = 1) = {

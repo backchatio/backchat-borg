@@ -15,10 +15,12 @@ trait ToZMQMessage[TMessage] {
 
 trait ZMQMessageFormat[TMessage] extends FromZMQMessage[BorgMessage] with ToZMQMessage[BorgMessage]
 
-class BorgZMQMessageSerializer extends ZMQMessageFormat[BorgMessage] with Logging {
+class BorgZMQMessageSerializer extends ZMQMessageFormat[BorgMessage] with Deserializer with Logging {
   def fromZMQMessage(msg: ZMQMessage) = {
     logger debug "Received [%d] frames".format(msg.frames.size)
     BorgMessage(msg.frames.last.payload)
   }
   def toZMQMessage(msg: BorgMessage) = ZMQMessage(msg.toProtobuf)
+
+  def apply(frames: Seq[Frame]): Any = fromZMQMessage(ZMQMessage(frames))
 }

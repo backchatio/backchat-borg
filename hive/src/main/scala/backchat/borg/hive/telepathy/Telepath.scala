@@ -17,10 +17,20 @@ trait Telepath extends Actor with Logging {
 
   lazy val context = ZeroMQ.newContext()
 
+  def socketListener:Option[ActorRef] = Some(self)
+  
   protected def newSocket(socketType: SocketType.Value, options: SocketOption*) = {
     val socketTimeout = options find (_.isInstanceOf[Timeout]) map (_.asInstanceOf[Timeout].value) getOrElse 100L
+    val deserializer = options find (_.isInstanceOf[MessageDeserializer]) map (_.asInstanceOf[MessageDeserializer].value) getOrElse new ZMQMessageDeserializer
     val timeo = akka.util.Duration(socketTimeout, TimeUnit.MILLISECONDS)
-    val params = SocketParameters(context, socketType, Some(self), pollTimeoutDuration = timeo, options = options.toSeq)
+    val realOptions = options.filterNot(o => o.isInstanceOf[Timeout] || o.isInstanceOf[MessageDeserializer])
+    val params = SocketParameters(
+      context,
+      socketType,
+      socketListener,
+      deserializer = deserializer,
+      pollTimeoutDuration = timeo,
+      options = realOptions)
     ZeroMQ.newSocket(params, Some(self), self.dispatcher)
   }
 }

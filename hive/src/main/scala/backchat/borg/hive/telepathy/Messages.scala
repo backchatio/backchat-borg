@@ -5,12 +5,15 @@ package telepathy
 
 import akka.actor._
 import borg.BorgMessage.MessageType
+import akka.zeromq.ZMQMessage
+import scalaz._
+import Scalaz._
 
 object Messages extends Logging {
   
   sealed class InvalidMessageException(borgMessage: BorgMessage) extends BorgException("Couldn't parse message: %s".format(borgMessage))
-  
-  sealed trait HiveRequest extends BorgMessageWrapper
+  sealed trait HiveMessage extends BorgMessageWrapper
+  sealed trait HiveRequest extends HiveMessage
   sealed trait HiveControlRequest extends HiveRequest
   
   sealed abstract class ControlRequest(val name: Symbol) extends HiveControlRequest {
@@ -33,7 +36,7 @@ object Messages extends Logging {
     def respond(payload: ApplicationEvent) = Reply(sender, payload, ccid = ccid)
   }
 
-  sealed trait HiveResponse extends BorgMessageWrapper
+  sealed trait HiveResponse extends HiveMessage
   sealed trait HiveControlResponse extends HiveResponse
 
   sealed abstract class ControlResponse(val name: Symbol) extends HiveControlResponse {
@@ -58,4 +61,16 @@ object Messages extends Logging {
       case m => throw new InvalidMessageException(m)
     }
   }
+  
+//  def unapply(msg: ZMQMessage) = BorgMessage(msg.frames.last.payload) match {
+//    case BorgMessage(MessageType.System, _, ApplicationEvent('pong, _), _, _) => Pong.some
+//    case BorgMessage(MessageType.FireForget, target, data, _, null) => Tell(target, data).some
+//    case BorgMessage(MessageType.FireForget, target, data, _, ccid) => Tell(target, data, ccid).some
+//    case BorgMessage(MessageType.RequestReply, target, data, Some(sender), null) => Ask(target, sender, data).some
+//    case BorgMessage(MessageType.RequestReply, target, data, Some(sender), ccid) => Ask(target, sender, data, ccid).some
+//    case BorgMessage(MessageType.RequestReply, target, data, None, null) => Reply(target, data).some
+//    case BorgMessage(MessageType.RequestReply, target, data, None, ccid) => Reply(target, data, ccid).some
+//    case m => None
+//  }
+
 }
