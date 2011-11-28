@@ -9,8 +9,11 @@
 
   <logger name="akka" level="ERROR" />
   <logger name="backchat" level="ERROR" />
+  <logger name="backchat.borg.cadence" level="DEBUG" />
+  <logger name="ALERTS" level="WARN" />
+
   <root>
-    <level value="ERROR"/>
+    <level value="INFO"/>
     <appender-ref ref="STDOUT"/>
   </root>
 

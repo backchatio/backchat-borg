@@ -12,16 +12,16 @@ import akka.util.Bootable
 import Alerter._
 
 /**
- * Polls Graphite and logs.
- *
- * TODO SDB:
- * - cleanup config + catch exceptions
+ * Polls Graphite and logs when a metric passes a threshold.
  */
-class Alerter(config: AlerterConfig) extends Bootable {
+class Alerter(config: AlerterConfig) extends Bootable with Logging {
   lazy val httpClient = new AsyncHttpClient
+
+  lazy val alertLogger = Logger("ALERTS")
 
   override def onLoad() {
     super.onLoad()
+    logger debug("polling %s every %d seconds: " format (config.url, config.period))
     Scheduler schedule(() => run, 0, config.period, TimeUnit.SECONDS)
   }
 
@@ -38,55 +38,70 @@ class Alerter(config: AlerterConfig) extends Bootable {
       req addQueryParameter("target", a.target)
     }
     val resp = req execute() get()
+    logger debug ("polling " + resp.getUri)
     val json = resp.getResponseBody
+    logger debug ("response:" + json)
     GraphiteResponse(json) foreach handle
   }
 
-  def handle(resp:  GraphiteResponse) = resp.metrics foreach { m =>
-    config.alerts find (_.target == m.target) foreach { a =>
-      val sum = (m.datapoints map (_.value)).sum
-      println(a.target + ": " + sum)
+  def warn(a: Alert, m: Metric) = alertLogger warn ("warn threshold for %s passed" format a.target)
+  def error(a: Alert, m: Metric) = alertLogger error ("error threshold for %s passed" format a.target)
+
+  def handle(resp:  GraphiteResponse) = {
+    logger debug("metric: "+resp.metrics)
+    resp.metrics foreach { m =>
+      config.alerts find (_.target == m.target) foreach { a =>
+        if (m.datapoints.size > 0) {
+          val sum = (m.datapoints map (_.value)).sum
+          val avg = sum / m.datapoints.size
+          logger debug("avg for %s: %s" format(a.target, avg))
+          avg match {
+            case e if avg > a.error => error(a, m)
+            case e if avg > a.warn => warn(a, m)
+            case _ =>
+          }
+        } else
+          logger debug("no data points for "+a.target)
+      }
     }
   }
 }
 
 object Alerter {
   class AlerterConfig(key: String = "application") extends Configuration(ConfigurationContext(key)) with MetricsConfig {
-      val applicationName = "Alerter"
-      val alerts = {
-        config.getSection("mojolly.borg.cadence.alerts") map { section =>
-          section.keys.map(_.split("\\.", 2)).map(_.head) map { k =>
-            Alert(
-              target = section.getString(k + ".graphitekeypattern").get,
-              warn = section.getInt(k + ".error").get,
-              error = section.getInt(k + ".warn").get
-            )
-          }
-        }
-      } get
-      val url = reporting map (r => "http://%s" format r.host) getOrElse "http://graphite"
-      val period = config.getSection("mojolly.reporting") flatMap { sect ⇒
-        sect.getInt("pollInterval")
-      } getOrElse 60
-    }
+    val applicationName = "Alerter"
+    val alerts = config.getSection("mojolly.borg.cadence.alerts") map { section =>
+      section.keys.map(_.split("\\.", 2)).map(_.head) map { k =>
+        Alert(
+          target = section.getString(k + ".graphitekeypattern").get,
+          warn = section.getDouble(k + ".error").get,
+          error = section.getDouble(k + ".warn").get
+        )
+      }
+    }  getOrElse Nil
+    val url = "http://%s" format (reporting map(_.host) getOrElse "graphite")
+    val period = config.getSection("mojolly.reporting") flatMap { sect ⇒
+      sect.getInt("pollInterval")
+    } getOrElse 60
+  }
 
-    case class Alert(target: String,  warn: Int, error: Int)
+  case class Alert(target: String,  warn: Double, error: Double)
 
-    case class GraphiteResponse(metrics: List[Metric])
-    case class Metric(target: String, datapoints: List[Datapoint])
-    case class Datapoint(timestamp: Long, value: Double)
+  case class GraphiteResponse(metrics: List[Metric])
+  case class Metric(target: String, datapoints: List[Datapoint])
+  case class Datapoint(timestamp: Long, value: Double)
 
-    object GraphiteResponse {
-      def apply(jsonString: String): Option[GraphiteResponse] = {
-        parse(jsonString) match {
-          case JArray(metric) => Some(GraphiteResponse(metric collect {
-            case JObject(JField("target", JString(target)) :: JField("datapoints", JArray(datapoints)) :: Nil) =>
-              Metric(target, datapoints collect {
-                case JArray(List(JDouble(v), JInt(timestamp))) => Datapoint(timestamp.toLong, v)
-              })
-            }))
-          case _ => None
-        }
+  object GraphiteResponse {
+    def apply(jsonString: String): Option[GraphiteResponse] = {
+      parse(jsonString) match {
+        case JArray(metric) => Some(GraphiteResponse(metric collect {
+          case JObject(JField("target", JString(target)) :: JField("datapoints", JArray(datapoints)) :: Nil) =>
+            Metric(target, datapoints collect {
+              case JArray(List(JDouble(v), JInt(timestamp))) => Datapoint(timestamp.toLong, v)
+            })
+          }))
+        case _ => None
       }
     }
+  }
 }
