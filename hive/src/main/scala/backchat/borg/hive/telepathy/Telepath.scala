@@ -22,12 +22,16 @@ trait Telepath extends Actor with Logging {
   protected def newSocket(socketType: SocketType.Value, options: SocketOption*) = {
     val socketTimeout = options find (_.isInstanceOf[Timeout]) map (_.asInstanceOf[Timeout].value) getOrElse 100L
     val deserializer = options find (_.isInstanceOf[MessageDeserializer]) map (_.asInstanceOf[MessageDeserializer].value) getOrElse new ZMQMessageDeserializer
+    val listener = options find (_.isInstanceOf[SocketListener]) map (_.asInstanceOf[SocketListener].value)
     val timeo = akka.util.Duration(socketTimeout, TimeUnit.MILLISECONDS)
-    val realOptions = options.filterNot(o => o.isInstanceOf[Timeout] || o.isInstanceOf[MessageDeserializer])
+    val realOptions = options filterNot {
+      case _:Timeout | _:MessageDeserializer | _: SocketListener => true
+      case _ => false
+    }
     val params = SocketParameters(
       context,
       socketType,
-      socketListener,
+      listener,
       deserializer = deserializer,
       pollTimeoutDuration = timeo,
       options = realOptions)

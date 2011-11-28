@@ -29,6 +29,7 @@ trait LongSocketOption extends SocketOption { type OptionType = Long }
 trait StringSocketOption extends SocketOption { type OptionType = String }
 trait BoolSocketOption extends SocketOption { type OptionType = Boolean }
 trait DeserializerSocketOption extends SocketOption { type OptionType = Deserializer }
+trait ActorRefSocketOption extends SocketOption { type OptionType = ActorRef }
 case class Linger(value: Long) extends LongSocketOption
 case class HWM(value: Long) extends LongSocketOption
 case class Affinity(value: Long) extends LongSocketOption
@@ -43,6 +44,7 @@ object Timeout {
 }
 case class Timeout(value: Long) extends LongSocketOption
 case class MessageDeserializer(value: Deserializer) extends DeserializerSocketOption
+case class SocketListener(value: ActorRef) extends ActorRefSocketOption
 
 object ZeroMQ {
   def newContext(numIoThreads: Int = 1) = {

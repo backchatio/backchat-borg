@@ -11,8 +11,8 @@ import borg.BorgMessage.MessageType
 import mojolly.{BackchatFormats, LibraryImports}
 import net.liftweb.json._
 import telepathy.Messages.{Tell, HiveRequest, Ask, HiveMessage}
-import telepathy.BinaryStar.BinaryStarDeserializer
 import java.util.concurrent.TimeUnit
+import telepathy.BinaryStar.BinaryStarDeserializer
 
 case class BinaryStarConfig(
              startAs: BinaryStar.BinaryStarRole,
@@ -41,8 +41,6 @@ object BinaryStar {
   case object Passive extends BinaryStarState
   case object Error extends BinaryStarState
 
-
-  
   object Messages {
 
     sealed trait BinaryStarMessage extends BorgMessageWrapper
@@ -87,12 +85,12 @@ object BinaryStar {
     import Messages._
     import config._
 
-    val deserializer = new BinaryStarDeserializer
-    var stateSub: ActorRef = newSocket(SocketType.Sub, MessageDeserializer(deserializer))
-    var statePub: ActorRef = newSocket(SocketType.Pub, MessageDeserializer(deserializer))
     var masterHandler: Option[ActorRef] = None
     var slaveHandler: Option[ActorRef] = None
-    
+
+    val deserializer = new BinaryStarDeserializer
+    val statePub: ActorRef = newSocket(SocketType.Pub, MessageDeserializer(deserializer))
+    val stateSub = newSocket(SocketType.Sub, MessageDeserializer(deserializer))
     
     startWith(startAs, ())
     val heartbeatInterval = akka.util.Duration(heartbeat.getMillis, TimeUnit.MILLISECONDS)
@@ -101,7 +99,7 @@ object BinaryStar {
     when(Primary) {
       case Event(PeerBackup) => {
         logger info ("Connected to backup (slave), ready as master")
-        listener foreach { _ ! Primary }
+        listener foreach { _ ! Active }
         goto(Active)
       }
       case Event(PeerActive) => goto(Passive)
@@ -138,10 +136,16 @@ object BinaryStar {
       case Event(ClientRequest(request)) =>
     }
     
+    whenUnhandled {
+      case Event(Heartbeat(millis)) => {
+        stay
+      }
+    }
+    
     when(Error) {
       case Event(a) => {
-        self.stop()
-        stay()
+        self.stop
+        stay
       }
     }
     
