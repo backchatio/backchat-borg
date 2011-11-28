@@ -11,21 +11,21 @@ import collection.mutable.ListBuffer
 import net.liftweb.json.JsonAST.{JArray, JString}
 import org.multiverse.api.latches.StandardLatch
 import java.util.concurrent.TimeUnit
-import org.specs2.specification.{Fragments, Step}
 import akka.zeromq.{ZMQMessage, Frame}
 import org.specs2.execute.Result
 import BorgMessage.MessageType
 import telepathy.Messages._
 import akka.actor._
-import mojolly.testing.{MojollySpecification, AkkaSpecification}
+import mojolly.testing.{MojollySpecification}
 
 object TestTelepathyServer {
   def newContext = ZMQ.context(1)
-  def apply(context: ZMQ.Context): (Socket, TelepathAddress) = {
+  def apply(context: ZMQ.Context, name: String = ""): (Socket, TelepathAddress) = {
     val socket = context.socket(ZMQ.XREP)
     val port = FreePort.randomFreePort(50)
     val addr = TelepathAddress("127.0.0.1", port)
     socket.bind(addr.address)
+    name.toOption foreach { n => socket.setIdentity(n.getBytes(Utf8)) }
     socket.setLinger(0L)
     (socket, addr)
   }
@@ -131,6 +131,8 @@ class ClientSpec extends MojollySpecification { def is =
     res
   }
   
+  def zmqMessage(frames: Seq[Frame]) = deser.fromZMQMessage(ZMQMessage(frames.last.payload.toArray).asInstanceOf[ZMQMessage])
+  
   def handlesEnqueue = {
     withContext { (context, poller) =>
       withServer(context, poller) { (server, address) =>
@@ -139,7 +141,7 @@ class ClientSpec extends MojollySpecification { def is =
           val latch = new StandardLatch
           
           poller += (server -> ((frames: Seq[Frame]) => {
-            val msg = deser.fromZMQMessage(ZMQMessage(frames.last.payload.toArray).asInstanceOf[ZMQMessage])
+            val msg = zmqMessage(frames)
             if (msg.target == "target" && msg.payload == appEvt) {
               latch.open()
             }
@@ -161,7 +163,7 @@ class ClientSpec extends MojollySpecification { def is =
           val appEvt2 = ApplicationEvent('pongpong, JArray(JString("the response message") :: Nil))
 
           poller += (server -> ((frames: Seq[Frame]) => {
-            val msg = deser.fromZMQMessage(ZMQMessage(frames.last.payload.toArray).asInstanceOf[ZMQMessage])
+            val msg = zmqMessage(frames)
             if (msg.target == "target" && msg.payload == appEvt && msg.messageType == MessageType.RequestReply) {
               server.send(frames.head.payload.toArray, ZMQ.SNDMORE)
               server.send(Messages(msg).asInstanceOf[Ask].respond(appEvt2).toBytes, 0)

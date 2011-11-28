@@ -10,27 +10,6 @@ import java.util.concurrent.TimeUnit
 import akka.zeromq._
 import akka.config.Supervision._
 
-trait FromZMQMessage[TMessage] {
-  def fromZMQMessage(msg: ZMQMessage): TMessage
-}
-
-trait ToZMQMessage[TMessage] {
-  def toZMQMessage(msg: TMessage): ZMQMessage
-}
-
-trait ZMQMessageFormat[TMessage] extends FromZMQMessage[BorgMessage] with ToZMQMessage[BorgMessage]
-
-class BorgZMQMessageSerializer extends ZMQMessageFormat[BorgMessage] with Logging {
-
-  def fromZMQMessage(msg: ZMQMessage) = {
-    logger debug "Received [%d] frames".format(msg.frames.size)
-    BorgMessage(msg.frames.last.payload)
-  }
-
-  def toZMQMessage(msg: BorgMessage) = ZMQMessage(msg.toProtobuf)
-}
-
-
 trait Telepath extends Actor with Logging {
 
   self.dispatcher = telepathyDispatcher
@@ -38,12 +17,12 @@ trait Telepath extends Actor with Logging {
 
   lazy val context = ZeroMQ.newContext()
 
-  protected def newSocket(socketType: SocketType.Value, socketTimeout: Duration = 100.millis) = {
-    val timeo = akka.util.Duration(socketTimeout.getMillis, TimeUnit.MILLISECONDS)
-    val params = SocketParameters(context, socketType, Some(self), pollTimeoutDuration = timeo)
+  protected def newSocket(socketType: SocketType.Value, options: SocketOption*) = {
+    val socketTimeout = options find (_.isInstanceOf[Timeout]) map (_.asInstanceOf[Timeout].value) getOrElse 100L
+    val timeo = akka.util.Duration(socketTimeout, TimeUnit.MILLISECONDS)
+    val params = SocketParameters(context, socketType, Some(self), pollTimeoutDuration = timeo, options = options.toSeq)
     ZeroMQ.newSocket(params, Some(self), self.dispatcher)
   }
-
 }
 
 case class TelepathAddress(host: String, port: Int, protocol: String = "tcp") {

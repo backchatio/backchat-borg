@@ -8,14 +8,38 @@ import akka.dispatch.{Dispatchers, MessageDispatcher}
 import akka.zeromq.SocketType._
 import akka.util.Duration
 import akka.util.duration._
+import org.joda.time.Period
 
 case class SocketParameters(
   context: Context, 
-  socketType: SocketType, 
-  listener: Option[ActorRef] = None, 
+  socketType: SocketType,
+  listener: Option[ActorRef] = None,
   deserializer: Deserializer = new ZMQMessageDeserializer,
-  pollTimeoutDuration: Duration = 100 millis
-)
+  pollTimeoutDuration: Duration = 100 millis,
+  options: Seq[SocketOption] = Seq.empty)
+
+trait SocketOption {
+  type OptionType
+  def value: OptionType
+}
+
+trait IntSocketOption extends SocketOption { type OptionType = Int }
+trait LongSocketOption extends SocketOption { type OptionType = Long }
+trait StringSocketOption extends SocketOption { type OptionType = String }
+trait BoolSocketOption extends SocketOption { type OptionType = Boolean }
+case class Linger(value: Long) extends LongSocketOption
+case class HWM(value: Long) extends LongSocketOption
+case class Affinity(value: Long) extends LongSocketOption
+case class Rate(value: Long) extends LongSocketOption
+case class RecoveryIVL(value: Long) extends LongSocketOption
+case class SndBuf(value: Long) extends LongSocketOption
+case class RcvBuf(value: Long) extends LongSocketOption
+case class Identity(value: String) extends StringSocketOption
+case class McastLoop(value: Boolean) extends BoolSocketOption
+object Timeout {
+  def apply(value: Period): Timeout = new Timeout(value.getMillis)
+}
+case class Timeout(value: Long) extends LongSocketOption
 
 object ZeroMQ {
   def newContext(numIoThreads: Int = 1) = {

@@ -12,7 +12,7 @@ case class TelepathClientConfig(server: TelepathAddress, listener: Option[ActorR
 
 class Client(config: TelepathClientConfig) extends Telepath {
 
-  lazy val socket = newSocket(SocketType.Dealer)
+  lazy val socket = newSocket(SocketType.Dealer, Linger(0L))
   var activeRequests = Map.empty[Uuid, CompletableFuture[Any]]
 
   override def preStart() {

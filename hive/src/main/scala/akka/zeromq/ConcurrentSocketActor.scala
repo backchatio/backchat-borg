@@ -7,6 +7,7 @@ import akka.actor.{Actor, ReceiveTimeout}
 import akka.dispatch.MessageDispatcher
 import org.zeromq.ZMQ.{Socket, Poller}
 import org.zeromq.{ZMQ => JZMQ}
+import java.nio.charset.Charset
 
 private[zeromq] class ConcurrentSocketActor(params: SocketParameters, dispatcher: MessageDispatcher) extends Actor {
 
@@ -38,6 +39,7 @@ private[zeromq] class ConcurrentSocketActor(params: SocketParameters, dispatcher
   }
 
   override def preStart {
+    configureSocket(socket)
     poller.register(socket, Poller.POLLIN)
   }
 
@@ -75,9 +77,8 @@ private[zeromq] class ConcurrentSocketActor(params: SocketParameters, dispatcher
 
   private def receiveFrames(): Seq[Frame] = {
     @inline def receiveBytes(): Array[Byte] = socket.recv(0) match {
-      case null => noBytes
-      case bytes: Array[Byte] if bytes.length > 0 => bytes
-      case _ => noBytes
+      case null | `noBytes` => noBytes
+      case bytes: Array[Byte] => bytes
     }
     receiveBytes() match {
       case `noBytes` => Vector.empty
@@ -92,11 +93,26 @@ private[zeromq] class ConcurrentSocketActor(params: SocketParameters, dispatcher
   }
 
   private def notifyListener(message: Any) {
-    params.listener.foreach { listener =>
+    params.listener foreach { listener =>
       if (listener.isShutdown)
         self.stop
       else
         listener ! message 
+    }
+  }
+
+  val Utf8 = Charset.forName("UTF-8")
+  private def configureSocket(sock: Socket) {
+    params.options foreach {
+      case Linger(value) => sock setLinger value
+      case HWM(value) => sock setHWM value
+      case Affinity(value) => sock setAffinity value
+      case Rate(value) => sock setRate value
+      case RecoveryIVL(value) => sock setReconnectIVL value
+      case SndBuf(value) => sock setSendBufferSize value
+      case RcvBuf(value) => sock setReceiveBufferSize value
+      case Identity(value) => sock setIdentity value.getBytes(Utf8)
+      case McastLoop(value) => sock setMulticastLoop value
     }
   }
 }

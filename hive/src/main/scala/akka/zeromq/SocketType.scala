@@ -11,4 +11,9 @@ object SocketType extends Enumeration {
   val Sub = Value(JZMQ.SUB)
   val Dealer = Value(JZMQ.XREQ)
   val Router = Value(JZMQ.XREP)
+  val Req = Value(JZMQ.REQ)
+  val Rep = Value(JZMQ.REP)
+  val Push = Value(JZMQ.PUSH)
+  val Pull = Value(JZMQ.PULL)
+  val Pair = Value(JZMQ.PAIR)
 }
