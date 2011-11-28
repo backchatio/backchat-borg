@@ -167,20 +167,9 @@ class ClientSpec extends MojollySpecification { def is =
               server.send(Messages(msg).asInstanceOf[Ask].respond(appEvt2).toBytes, 0)
             }}))
           
-          var res: Option[ApplicationEvent] = None
-          val subj = Actor.actorOf(new Actor {
-            def receive = {
-              case 'makeRequest => {
-                val req = client ? Ask("target", appEvt)
-                res = Some(req.as[ApplicationEvent].get)
-              }
-            }
-          }).start()
-          
-          subj ! 'makeRequest
+          val req = client ? Ask("target", appEvt)
           poller.poll(5000)
-          subj.stop()
-          res must be_==(Some(appEvt2)).eventually
+          req.as[ApplicationEvent].get must_== appEvt2
         }
       }
     }

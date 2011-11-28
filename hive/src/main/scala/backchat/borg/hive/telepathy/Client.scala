@@ -5,8 +5,7 @@ package telepathy
 
 import akka.actor._
 import akka.zeromq._
-import collection.mutable
-import akka.dispatch.{CompletableFuture, Future}
+import akka.dispatch.CompletableFuture
 import telepathy.Messages.{Reply, Ask, Tell}
 
 case class TelepathClientConfig(server: TelepathAddress, listener: Option[ActorRef] = None)
@@ -23,14 +22,14 @@ class Client(config: TelepathClientConfig) extends Telepath {
   protected def receive = {
     case 'init => {
       socket ! Connect(config.server.address)
-      logger debug "Establishing connection to server"
+      logger trace "Establishing connection to server"
     }
     case m: Tell => {
-      logger debug "enqueuing a message to a server"
+      logger trace "enqueuing a message to a server: %s".format(m)
       socket ! serialize(m)
     }
     case m: Ask => {
-      logger debug "Sending a request to a server"
+      logger trace "Sending a request to a server: %s".format(m)
       self.senderFuture foreach { fut =>
         activeRequests += m.ccid -> fut
         socket ! serialize(m)
@@ -38,15 +37,12 @@ class Client(config: TelepathClientConfig) extends Telepath {
     }
     case m: ZMQMessage => deserialize(m) match {
       case rep: Reply => {
-        logger debug "processing a reply: %s".format(rep)
-        activeRequests get rep.ccid foreach { fut =>
-          logger debug "completing future"
-          fut completeWithResult rep.payload
-        }
+        logger trace "processing a reply: %s".format(rep)
+        activeRequests get rep.ccid foreach { _ completeWithResult rep.payload }
       }
     }
     case Connecting => {
-      logger debug "Connecting to server"
+      logger info "Connected to server"
       config.listener foreach { _ ! 'Connected }
     }
     case Closed => {
