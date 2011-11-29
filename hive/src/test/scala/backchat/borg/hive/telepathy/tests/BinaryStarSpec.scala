@@ -20,27 +20,44 @@ trait ActorSpecification extends MojollySpecification {
 
 class BinaryStarSpec extends ActorSpecification { def is =
   "A BinaryStar should" ^
-    "when started as primary" ^
-      "send the appropriate state as heartbeat" ! primary.sendsPeerPrimaryOnHeartbeat ^
+    "when started as primary" ^ t ^
+      sendsHearbeat(primary, PeerPrimary) ^
       "and a PeerBackup is received" ^
         "notify the listener to activate" ! primary.notifiesListenerToActivate(PeerBackup) ^
         "move to state active" ! primary.goesToActivate(PeerBackup) ^ bt ^
-      "and a PeerActive is received" ^
-        "notify the listener to deactivate" ! primary.notifiesListenerToDeactivate ^
-        "move to state passive" ! primary.goesToPassive(PeerActive) ^ bt ^
+      `and a PeerActive is received`(primary) ^
       "and a client request is received" ^
         "notify the listener to activate" ! primary.notifiesListenerToActivate(ClientRequest(Ping)) ^
         "move to state active" ! primary.goesToActivate(ClientRequest(Ping)) ^
-        "forward the message to the handler" ! primary.forwardsRequest ^ bt ^
-    "when started as backup" ^
-      "send the appropriate state as heartbeat" ! pending ^ end
+        "forward the message to the handler" ! primary.forwardsRequest ^ bt ^ bt ^
+    "when started as backup" ^ t ^
+      sendsHearbeat(backup, PeerBackup) ^
+      `and a PeerActive is received`(backup) ^ bt ^
+    "when running in Passive mode" ^
+      sendsHearbeat(passive, PeerPassive) ^
+    "when running in Active mode" ^
+      sendsHearbeat(active, PeerActive) ^ end
 
-  def primary = new PrimaryBinaryStartContext
-  
-  trait BinaryStarContext extends TestKit {
+
+  def sendsHearbeat(context: BinaryStarContext, msg: BinaryStarEvent) = {
+    "send the appropriate state as heartbeat" ! context.sendsHeartbeat(msg) ^ bt
+  }
+
+  def `and a PeerActive is received`(context: BinaryStarContext) = {
+    "and a PeerActive is received" ^
+      "notify the listener to deactivate" ! context.notifiesListenerToDeactivate ^
+      "move to state passive" ! context.goesToPassive(PeerActive) ^ bt
+  }
+
+  def primary = new PrimaryBinaryStarContext
+  def backup = new BackupBinaryStarContext
+  def passive = new PassiveBinaryStarContext
+  def active = new ActiveBinaryStarContext
+
+  trait BinaryStarContext extends TestKit with ZeroMqContext {
     import BinaryStar._
     
-    def startAs: BinaryStar.BinaryStarRole
+    def startAs: BinaryStar.BinaryStarState
     val listener = TestProbe()
 
     lazy val port = FreePort.randomFreePort(50)
@@ -63,20 +80,12 @@ class BinaryStarSpec extends ActorSpecification { def is =
       fn(st)
     }
 
-  }
-  
-  class PrimaryBinaryStartContext extends BinaryStarContext with ZeroMqContext {
-
-    import BinaryStar._
-    import Messages._
-    val startAs = BinaryStar.Primary
-
-    def sendsPeerPrimaryOnHeartbeat = this {
+    def sendsHeartbeat(msg: BinaryStarEvent) = this {
       withServer(ZMQ.SUB) { server =>
         val latch = TestLatch()
         server onMessage { frames =>
           Messages(zmqMessage(frames)) match {
-            case PeerPrimary => latch.countDown()
+            case `msg` => latch.countDown()
             case _ =>
           }
         }
@@ -87,7 +96,7 @@ class BinaryStarSpec extends ActorSpecification { def is =
         }
       }
     }
-    
+
     def notifiesListenerToActivate(msg: Any) = this {
       val fsm = TestFSMRef(new Reactor(defaultConfig.copy(listener = Some(testActor)))).start
       fsm ! msg
@@ -111,7 +120,35 @@ class BinaryStarSpec extends ActorSpecification { def is =
       fsm ! PeerActive
       receiveOne(2.seconds) must_== Passive
     }
-    
+
+  }
+  
+  class BackupBinaryStarContext extends BinaryStarContext  {
+    import BinaryStar._
+    import Messages._
+    val startAs = BinaryStar.Backup
+
+  }
+  class PassiveBinaryStarContext extends BinaryStarContext  {
+    import BinaryStar._
+    import Messages._
+    val startAs = BinaryStar.Passive
+
+  }
+  
+  class ActiveBinaryStarContext extends BinaryStarContext  {
+    import BinaryStar._
+    import Messages._
+    val startAs = BinaryStar.Active
+
+  }
+
+  class PrimaryBinaryStarContext extends BinaryStarContext {
+
+    import BinaryStar._
+    import Messages._
+    val startAs = BinaryStar.Primary
+
     def forwardsRequest = this {
       val fsm = TestFSMRef(new Reactor(defaultConfig.copy(listener = Some(testActor)))).start
       fsm ! ClientRequest(Ping)

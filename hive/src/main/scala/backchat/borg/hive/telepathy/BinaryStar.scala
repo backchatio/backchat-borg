@@ -46,7 +46,7 @@ case class HiveTimer(interval: Duration, task: Runnable, initialDelay: Duration 
 }
 
 case class BinaryStarConfig(
-             startAs: BinaryStar.BinaryStarRole,
+             startAs: BinaryStar.BinaryStarState,
              frontend: TelepathAddress,
              statePub: TelepathAddress,
              stateSub: TelepathAddress,
@@ -250,7 +250,7 @@ object BinaryStar {
       }
       case Ev(PeerPassive) => {
         logger error "We have dual slaves, confused"
-        stay()
+        stay
       }
       case Ev(ClientRequest(request)) => {
         require(nextPeerExpiry > 0)
