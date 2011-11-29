@@ -11,6 +11,7 @@ import akka.actor.{ActorRef, Scheduler, Actor}
 import org.specs2.execute.Result
 import mojolly.io.FreePort
 import akka.testkit._
+import telepathy.BinaryStar.Messages.PeerBackup
 
 trait ActorSpecification extends MojollySpecification {
   override def map(fs: => Fragments) =  super.map(fs) ^ Step(Actor.registry.shutdownAll()) // ^ Step(Scheduler.restart())
@@ -22,7 +23,7 @@ class BinaryStarSpec extends ActorSpecification { def is =
       "send the appropriate state as heartbeat" ! primary.sendsPeerPrimaryOnHeartbeat ^ bt ^
       "and a PeerBackup is received" ^
         "notify the listener to activate" ! primary.notifiesListenerToActivate ^
-        "move to state active" ! pending ^ bt ^
+        "move to state active" ! primary.goesToActivate(PeerBackup) ^ bt ^
       "and a PeerActive is received" ^
         "notify the listener to deactivate" ! pending ^
         "move to state passive" ! pending ^ bt ^
@@ -91,8 +92,18 @@ class BinaryStarSpec extends ActorSpecification { def is =
       val fsm = TestFSMRef(new Reactor(defaultConfig.copy(listener = Some(probe.ref))))
       fsm.start()
       fsm ! PeerBackup
-      (probe.receiveOne(2.seconds) must_== Active) and (fsm.stateName must be_==(Active).eventually)
+      (probe.receiveOne(2.seconds) must_== Active)
     }
+
+    def goesToActivate(msg: BinaryStarEvent) = this {
+      val probe = TestProbe()
+      val fsm = TestFSMRef(new Reactor(defaultConfig.copy(listener = Some(probe.ref))))
+      fsm.start()
+      fsm ! msg
+      fsm.stateName must be_==(Active).eventually
+    }
+
+
     
   }
 }
