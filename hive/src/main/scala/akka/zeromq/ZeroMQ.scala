@@ -8,8 +8,8 @@ import akka.dispatch.{Dispatchers, MessageDispatcher}
 import akka.zeromq.SocketType._
 import akka.util.Duration
 import akka.util.duration._
-import org.joda.time.Period
-import backchat.borg.BorgMessage
+import org.joda.time.{ Duration => JodaDuration }
+
 
 case class SocketParameters(
   context: Context, 
@@ -42,7 +42,8 @@ case class RcvBuf(value: Long) extends LongSocketOption
 case class Identity(value: String) extends StringSocketOption
 case class McastLoop(value: Boolean) extends BoolSocketOption
 object Timeout {
-  def apply(value: Period): Timeout = new Timeout(value.getMillis)
+  def apply(value: JodaDuration): Timeout = new Timeout(value.getMillis)
+  def apply(value: Duration): Timeout = new Timeout(value.toMillis)
 }
 case class Timeout(value: Long) extends LongSocketOption
 case class MessageDeserializer(value: Deserializer) extends DeserializerSocketOption

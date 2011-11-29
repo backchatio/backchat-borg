@@ -13,6 +13,7 @@ object BackchatBorgBuild extends Build {
   val commonSettings = buildSettings ++ Seq(
     version := buildVersion, 
     organization := buildOrganization)
+//    testOptions in Test += Tests.Setup( () => System.setProperty("akka.output.config.source", "1") ))
 
   val root = (Project ("backchat-borg", file("."), settings = commonSettings ++ Seq(
       mainClass := Some("backchat.borg.samples.ClientTestServer"),

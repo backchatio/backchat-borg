@@ -21,7 +21,7 @@ class BinaryStarSpec extends ActorSpecification { def is =
     "when started as primary" ^
       "send the appropriate state as heartbeat" ! primary.sendsPeerPrimaryOnHeartbeat ^ bt ^
       "and a PeerBackup is received" ^
-        "notify the listener to activate" ! pending ^
+        "notify the listener to activate" ! primary.notifiesListenerToActivate ^
         "move to state active" ! pending ^ bt ^
       "and a PeerActive is received" ^
         "notify the listener to deactivate" ! pending ^
@@ -45,6 +45,11 @@ class BinaryStarSpec extends ActorSpecification { def is =
     lazy val defaultVoter = TelepathAddress("127.0.0.1", port)
     lazy val defaultSub = TelepathAddress("127.0.0.1", port + 1)
     lazy val defaultPub = TelepathAddress("127.0.0.1", port + 2)
+    lazy val defaultConfig = BinaryStarConfig(startAs,
+                                              defaultVoter,
+                                              defaultPub,
+                                              defaultSub,
+                                              None)
     def withStar[T](voter: TelepathAddress = defaultVoter, stateSub: TelepathAddress = defaultSub, statePub: TelepathAddress = defaultPub)(fn: ActorRef => T)(implicit evidence$1: (T) => Result): T = {
       val cfg = BinaryStarConfig(
             startAs,
@@ -52,7 +57,6 @@ class BinaryStarSpec extends ActorSpecification { def is =
             statePub,
             stateSub,
             None)
-      println("creating binary star with: %s" format cfg)
       val st = Actor.actorOf(new Reactor(cfg)).start()
       fn(st)
     }
@@ -67,21 +71,27 @@ class BinaryStarSpec extends ActorSpecification { def is =
 
     def sendsPeerPrimaryOnHeartbeat = this {
       withServer(ZMQ.SUB) { server =>
-        sleep -> 500.millis
         val latch = TestLatch()
         server onMessage { frames =>
-          println("received frames on the server")
           Messages(zmqMessage(frames)) match {
             case PeerPrimary => latch.countDown()
-            case m => sys.error("Received unknown message: %s".format(m))
+            case _ =>
           }
         }
         withStar(statePub = server.address) { star =>
           star ! BinaryStar.Messages.Heartbeat
           server.poll(2.seconds)
-          latch.await(TestLatch.DefaultTimeout) must beTrue
+          latch.await(10.millis) must beTrue
         }
       }
+    }
+    
+    def notifiesListenerToActivate = this {
+      val probe = TestProbe()
+      val fsm = TestFSMRef(new Reactor(defaultConfig.copy(listener = Some(probe.ref))))
+      fsm.start()
+      fsm ! PeerBackup
+      probe.receiveOne(2.seconds) must_== Active
     }
     
   }
