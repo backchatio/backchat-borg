@@ -91,7 +91,7 @@ class BinaryStarSpec extends ActorSpecification { def is =
       val fsm = TestFSMRef(new Reactor(defaultConfig.copy(listener = Some(probe.ref))))
       fsm.start()
       fsm ! PeerBackup
-      probe.receiveOne(2.seconds) must_== Active
+      (probe.receiveOne(2.seconds) must_== Active) and (fsm.stateName must be_==(Active).eventually)
     }
     
   }
