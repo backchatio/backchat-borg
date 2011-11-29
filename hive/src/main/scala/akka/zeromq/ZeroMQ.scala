@@ -30,7 +30,9 @@ trait StringSocketOption extends SocketOption { type OptionType = String }
 trait BoolSocketOption extends SocketOption { type OptionType = Boolean }
 trait DeserializerSocketOption extends SocketOption { type OptionType = Deserializer }
 trait ActorRefSocketOption extends SocketOption { type OptionType = ActorRef }
-case class Linger(value: Long) extends LongSocketOption
+abstract class LingerOption(val value: Long) extends LongSocketOption
+case class Linger(override val value: Long) extends LingerOption(value)
+case object NoLinger extends LingerOption(0)
 case class HWM(value: Long) extends LongSocketOption
 case class Affinity(value: Long) extends LongSocketOption
 case class Rate(value: Long) extends LongSocketOption

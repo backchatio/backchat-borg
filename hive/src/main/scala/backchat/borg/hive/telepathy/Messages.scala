@@ -10,7 +10,7 @@ import scalaz._
 import Scalaz._
 
 object Messages extends Logging {
-  
+
   sealed class InvalidMessageException(borgMessage: BorgMessage) extends BorgException("Couldn't parse message: %s".format(borgMessage))
   sealed trait HiveMessage extends BorgMessageWrapper
   sealed trait HiveRequest extends HiveMessage

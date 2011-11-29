@@ -104,7 +104,7 @@ private[zeromq] class ConcurrentSocketActor(params: SocketParameters, dispatcher
   val Utf8 = Charset.forName("UTF-8")
   private def configureSocket(sock: Socket) {
     params.options foreach {
-      case Linger(value) => sock setLinger value
+      case lo: LingerOption => sock setLinger lo.value
       case HWM(value) => sock setHWM value
       case Affinity(value) => sock setAffinity value
       case Rate(value) => sock setRate value

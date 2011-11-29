@@ -17,18 +17,36 @@ import BorgMessage.MessageType
 import telepathy.Messages._
 import akka.actor._
 import mojolly.testing.{MojollySpecification}
+import org.specs2.specification.{Around, After, Step, Fragments}
+import util.DynamicVariable
 
 object TestTelepathyServer {
+  type ZMessageHandler = Seq[Frame] ⇒ Any
   def newContext = ZMQ.context(1)
-  def apply(context: ZMQ.Context, name: String = ""): (Socket, TelepathAddress) = {
-    val socket = context.socket(ZMQ.XREP)
+  def apply(context: ZMQ.Context, poller: ZeroMQPoller, socketType: Int = ZMQ.XREP, name: String = ""): Server = {
+    val socket = context.socket(socketType)
     val port = FreePort.randomFreePort(50)
-    val addr = TelepathAddress("127.0.0.1", port)
+    val addr = TelepathAddress("127.0.0.1", Some(port))
     socket.bind(addr.address)
     name.toOption foreach { n => socket.setIdentity(n.getBytes(Utf8)) }
     socket.setLinger(0L)
-    (socket, addr)
+    Server(socket, addr, poller, context)
   }
+  
+  case class Server(socket: Socket,  address: TelepathAddress, poller: ZeroMQPoller, context: ZMQ.Context) {    
+    def stop = {
+      poller -= socket
+      socket.close()
+      poller.dispose()
+    }
+    
+    def onMessage(fn: ZMessageHandler) = {
+      poller += socket -> fn
+    }
+
+    def poll(timo: Long = -1) = poller.poll(timo)
+  }
+  
 }
 
 class ZeroMQPoller(context: Context) {
@@ -100,80 +118,98 @@ class ZeroMQPoller(context: Context) {
   def isEmpty = size > 0
 }
 
-class ClientSpec extends MojollySpecification { def is =
-  "A telepathic client should" ^
-    "when responding to messages" ^
-      "handle an enqueue message" ! handlesEnqueue ^
-      "handle a request message" ! handlesRequest ^ end
+trait ZeroMqSpecification extends MojollySpecification {
+  
+  val zmqContext = ZMQ.context(1)
+  val poller = new ZeroMQPoller(zmqContext)
+  
+//  override def map(fs: => Fragments) = super.map(fs) ^ Step(poller.dispose()) ^ Step(zmqContext.term())
+}
+trait ZeroMqContext extends Around {
   
   val deser = new BorgZMQMessageSerializer
 
-  def withContext[T](fn: (Context, ZeroMQPoller) => T)(implicit evidence$1: (T) => Result): T = {
-    val ctxt = TestTelepathyServer.newContext
-    val poller = new ZeroMQPoller(ctxt)
-    val rs = fn(ctxt, poller)
-    ctxt.term
-    rs
-  }
-  
-  def withServer[T](ctxt: Context, poller: ZeroMQPoller)(fn: (Socket, TelepathAddress) => T)(implicit evidence$1: (T) => Result): T = {
-    val kv = TestTelepathyServer(ctxt)
-    val res = fn.tupled.apply(kv)
-    poller.dispose()
-    kv._1.close()
+  val _zmqContext = new DynamicVariable[ZMQ.Context](null)
+  def zmqContext = _zmqContext.value
+
+  def around[T](t: => T)(implicit evidence$1: (T) => Result) = {
+    val ctxt = ZMQ.context(1)
+    val res = _zmqContext.withValue(ctxt)(t)
+    ctxt.term()
     res
   }
-  
+
+  def withServer[T](socketType: Int = ZMQ.XREP)(fn: TestTelepathyServer.Server => T)(implicit evidence$1: (T) => Result): T = {
+    require(zmqContext.isNotNull)
+    val poller = new ZeroMQPoller(zmqContext)    
+    val kv = TestTelepathyServer(zmqContext, poller, socketType = socketType)
+    val res = fn(kv)
+    kv.stop
+    res
+  }
+
   def withClient[T](address: TelepathAddress)(fn: ActorRef => T)(implicit evidence$1: (T) => Result): T = {
     val client = newTelepathicClient(address.address)
     val res = fn(client)
     client.stop()
     res
   }
-  
+
   def zmqMessage(frames: Seq[Frame]) = deser.fromZMQMessage(ZMQMessage(frames.last.payload.toArray).asInstanceOf[ZMQMessage])
+
+}
+
+class ClientSpec extends MojollySpecification { def is =
+  "A telepathic client should" ^
+    "when responding to messages" ^
+      "handle an enqueue message" ! context.handlesEnqueue ^
+      "handle a request message" ! context.handlesRequest ^ end
   
-  def handlesEnqueue = {
-    withContext { (context, poller) =>
-      withServer(context, poller) { (server, address) =>
-        withClient(address) { client => 
+  def context = new ClientSpecContext
+  
+  class ClientSpecContext extends ZeroMqContext {
+    def handlesEnqueue = this {
+      withServer() { server =>
+        withClient(server.address) { client =>
           val appEvt = ApplicationEvent('pingping, JArray(JString("the message") :: Nil))
           val latch = new StandardLatch
-          
-          poller += (server -> ((frames: Seq[Frame]) => {
+  
+          server onMessage { (frames: Seq[Frame]) =>
             val msg = zmqMessage(frames)
             if (msg.target == "target" && msg.payload == appEvt) {
               latch.open()
             }
-          }))
-      
+          }
+  
           client ! Tell("target", appEvt)
-          poller.poll(5000)
+          server.poll(2000)
           latch.tryAwait(2, TimeUnit.SECONDS) must beTrue
+        }
+      }
+    }
+    
+    def handlesRequest = this {
+      withServer() { server =>
+        withClient(server.address) { client =>
+          val appEvt = ApplicationEvent('pingping, JArray(JString("the message") :: Nil))
+          val appEvt2 = ApplicationEvent('pongpong, JArray(JString("the response message") :: Nil))
+  
+          server onMessage { (frames: Seq[Frame]) =>
+            val msg = zmqMessage(frames)
+            println("server received: %s" format msg)
+            if (msg.target == "target" && msg.payload == appEvt && msg.messageType == MessageType.RequestReply) {
+              server.socket.send(frames.head.payload.toArray, ZMQ.SNDMORE)
+              server.socket.send(Messages(msg).asInstanceOf[Ask].respond(appEvt2).toBytes, 0)
+            }
+          }
+  
+          val req = client ? Ask("target", appEvt)
+          server.poll(2000)
+          req.as[ApplicationEvent] must beSome(appEvt2)
         }
       }
     }
   }
   
-  def handlesRequest = {
-    withContext { (context, poller) =>
-      withServer(context, poller) { (server, address) =>
-        withClient(address) { client =>
-          val appEvt = ApplicationEvent('pingping, JArray(JString("the message") :: Nil))
-          val appEvt2 = ApplicationEvent('pongpong, JArray(JString("the response message") :: Nil))
-
-          poller += (server -> ((frames: Seq[Frame]) => {
-            val msg = zmqMessage(frames)
-            if (msg.target == "target" && msg.payload == appEvt && msg.messageType == MessageType.RequestReply) {
-              server.send(frames.head.payload.toArray, ZMQ.SNDMORE)
-              server.send(Messages(msg).asInstanceOf[Ask].respond(appEvt2).toBytes, 0)
-            }}))
-          
-          val req = client ? Ask("target", appEvt)
-          poller.poll(5000)
-          req.as[ApplicationEvent].get must_== appEvt2
-        }
-      }
-    }
-  }
+  
 }
