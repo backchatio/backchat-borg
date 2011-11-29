@@ -20,7 +20,7 @@ trait ActorSpecification extends MojollySpecification {
 class BinaryStarSpec extends ActorSpecification { def is =
   "A BinaryStar should" ^
     "when started as primary" ^
-      "send the appropriate state as heartbeat" ! primary.sendsPeerPrimaryOnHeartbeat ^ bt ^
+      "send the appropriate state as heartbeat" ! primary.sendsPeerPrimaryOnHeartbeat ^ 
       "and a PeerBackup is received" ^
         "notify the listener to activate" ! primary.notifiesListenerToActivate ^
         "move to state active" ! primary.goesToActivate(PeerBackup) ^ bt ^
