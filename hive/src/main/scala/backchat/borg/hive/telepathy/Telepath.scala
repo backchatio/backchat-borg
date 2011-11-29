@@ -46,6 +46,14 @@ object TelepathAddress {
     val auth = uri.authority.get
     TelepathAddress(auth.host.value, auth.port, uri.scheme.scheme)
   }
+  
+  def apply(host: String, port: Int): TelepathAddress = {
+    TelepathAddress(host, Some(port))
+  }
+
+  def apply(host: String, port: Int, protocol: String): TelepathAddress = {
+      TelepathAddress(host, Some(port), protocol)
+    }
 }
 case class TelepathAddress(host: String, port: Option[Int], protocol: String = "tcp") {
   def address = "%s://%s%s" format (protocol, host, port some (":%d" format _) none "")

@@ -32,6 +32,7 @@ object BackchatBorgBuild extends Build {
       mojollyLibrary("core"),
       mojollyLibrary("io"),
       commons("codec", "1.5"),
+      akka("slf4j"),
       specs2, scalaTest, akkaTestkit, mockito, mojollyLibrary("testing") % "test"
     ))))
 

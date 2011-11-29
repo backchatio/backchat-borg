@@ -12,7 +12,7 @@ import mojolly.io.{FreePort, TempDir}
 
 class NoRandomPortAvailableException extends Exception
 
-class ZooKeeperTestServer(sessionTimeout: Period = 100.millis, maxRetries: Int = 5) extends Logging {
+class ZooKeeperTestServer(sessionTimeout: Duration = 100.millis, maxRetries: Int = 5) extends Logging {
   private val shutDownActions = mutable.ListBuffer.empty[() ⇒ Unit]
   private var connectionFactory: ServerCnxnFactory = null
   private var started = false

@@ -9,19 +9,19 @@ import borg.BorgMessage.MessageType
 import net.liftweb.json._
 import telepathy.Messages.{Tell, HiveRequest, Ask}
 import java.util.concurrent.TimeUnit
-import telepathy.BinaryStar.Voter
 import mojolly.{ScheduledTask, BackchatFormats}
+import telepathy.BinaryStar.Voter
 
 object HiveTimer {
   
   private def r(thunk: => Any) = new Runnable {
     def run() { thunk }
   }
-  def apply(interval: Period, receiver: ActorRef,  message: Any): HiveTimer = {
-    new HiveTimer(interval, r { receiver ! message }, 0.seconds, true)
+  def apply(interval: Duration, receiver: ActorRef,  message: Any): HiveTimer = {
+    new HiveTimer(interval, r { receiver ! message }, 0.millis, true)
   }
 }
-case class HiveTimer(interval: Period, task: Runnable, initialDelay: Period = 0.seconds, repeat: Boolean = false) {
+case class HiveTimer(interval: Duration, task: Runnable, initialDelay: Duration = 0.seconds, repeat: Boolean = false) {
   private var _task: ScheduledTask = _
   
   def isActive = _task.isNotNull && _task.isActive
@@ -29,9 +29,9 @@ case class HiveTimer(interval: Period, task: Runnable, initialDelay: Period = 0.
   
   def start = {
     val fut = if (repeat)
-      Scheduler.schedule(task, initialDelay.getMillis, interval.getMillis, TimeUnit.MILLISECONDS)
+      Scheduler.schedule(task, initialDelay.millis, interval.millis, TimeUnit.MILLISECONDS)
     else 
-      Scheduler.scheduleOnce(task, interval.getMillis, TimeUnit.MILLISECONDS)
+      Scheduler.scheduleOnce(task, interval.millis, TimeUnit.MILLISECONDS)
     _task = ScheduledTask(fut)
   }
   
@@ -51,7 +51,7 @@ case class BinaryStarConfig(
              statePub: TelepathAddress,
              stateSub: TelepathAddress,
              listener: Option[ActorRef] = None,
-             heartbeat: Period = 1.second)
+             heartbeat: Duration = 1.second)
 
 object BinaryStar {
   
@@ -83,7 +83,11 @@ object BinaryStar {
     protected def onDeactivate() {}
   }
   
-  sealed trait BinaryStarState
+  sealed trait BinaryStarState {
+
+    override def toString = { getClass.getSimpleName split "\\$" filter (_.nonEmpty) last }
+
+  }
   sealed trait BinaryStarRole extends BinaryStarState
   case object Primary extends BinaryStarRole
   case object Backup extends BinaryStarRole
@@ -96,7 +100,7 @@ object BinaryStar {
     sealed trait BinaryStarMessage extends BorgMessageWrapper
     sealed trait BinaryStarEvent extends BinaryStarMessage {
       def symbol: Symbol
-      def unwrapped = BorgMessage(MessageType.System, null, ApplicationEvent(symbol))
+      def unwrapped = BorgMessage(MessageType.System, "", ApplicationEvent(symbol))
     }
     abstract class BinaryStarEventImpl(val symbol: Symbol) extends BinaryStarEvent
     case object PeerPrimary extends BinaryStarEventImpl('primary)
@@ -127,11 +131,18 @@ object BinaryStar {
     protected def receive = {
       case Connecting | Closed =>
       case m: ZMQMessage => {
+        logger debug "voter received event"
         val msg = telepathy.Messages(serializer fromZMQMessage m)
         reactor ! Messages.ClientRequest(msg)
       }
     }
   }
+  
+//  class Reactor(fsm: ActorRef) extends Telepath {
+//    protected def receive = {
+//      case _ =>
+//    }
+//  }
   
   /*
    * The binary star reactor links several components.
@@ -148,20 +159,33 @@ object BinaryStar {
     def schedulePeerExpiry = System.currentTimeMillis + (2 * config.heartbeat.millis)
     
     val deserializer = new BinaryStarDeserializer
-    val statePub: ActorRef = newSocket(SocketType.Pub, MessageDeserializer(deserializer))
-    val stateSub = newSocket(SocketType.Sub, MessageDeserializer(deserializer))
-    val voter = newSocket(SocketType.Router, NoLinger, SocketListener(voterListener))
-    val heartbeat = HiveTimer(config.heartbeat, self, Heartbeat)
-    
-    private def voterListener = {
+    val statePub: ActorRef = newSocket(SocketType.Pub, MessageDeserializer(deserializer), SocketListener(stateListener))
+    val stateSub: ActorRef = newSocket(SocketType.Sub, MessageDeserializer(deserializer), SocketListener(stateListener))
+    val voter: ActorRef = newSocket(SocketType.Router, NoLinger, SocketListener(voterListener))
+
+    private lazy val voterListener = {
       val l = Actor.actorOf(new Voter(self))
       self startLink l
       l
     }
     
+    private lazy val stateListener = {
+      val parent = self
+      val l = Actor.actorOf(new Actor {
+        def receive = {
+          case Connecting | Closed =>
+          case m: BinaryStarEvent => {
+            logger debug "state listener received an event: %s".format(m)
+            nextPeerExpiry = schedulePeerExpiry
+            parent ! m
+          }
+        }
+      })
+      self startLink l
+      l
+    }
+    
     startWith(config.startAs, ())
-    val heartbeatInterval = akka.util.Duration(config.heartbeat.getMillis, TimeUnit.MILLISECONDS)
-
 
     when(Primary) {
       case Ev(PeerBackup) => {
@@ -181,6 +205,7 @@ object BinaryStar {
         goto(Active)
       }
       case Ev(Heartbeat) => {
+        logger debug "[%s] Received heartbeat command".format(stateName)
         statePub ! deserializer.toZMQMessage(PeerPrimary.unwrapped)
         stay
       }
@@ -196,6 +221,7 @@ object BinaryStar {
         stay
       }
       case Ev(Heartbeat) => {
+        logger debug "[%s] Received heartbeat command".format(stateName)
         statePub ! deserializer.toZMQMessage(PeerBackup.unwrapped)
         stay
       }
@@ -207,6 +233,7 @@ object BinaryStar {
         goto(Error)
       }
       case Ev(Heartbeat) => {
+        logger debug "[%s] Received heartbeat command".format(stateName)
         statePub ! deserializer.toZMQMessage(PeerActive.unwrapped)
         stay
       }
@@ -226,6 +253,7 @@ object BinaryStar {
         stay()
       }
       case Ev(ClientRequest(request)) => {
+        require(nextPeerExpiry > 0)
         if (System.currentTimeMillis >= nextPeerExpiry) {
           logger info "Failover succeeded, ready as master"
           goto(Active)
@@ -234,7 +262,18 @@ object BinaryStar {
         }
       }
       case Ev(Heartbeat) => {
+        logger debug "[%s] Received heartbeat command".format(stateName)
         statePub ! deserializer.toZMQMessage(PeerPassive.unwrapped)
+        stay
+      }
+    }
+    
+    whenUnhandled {
+      case Ev('init) => {
+        voter ! Bind(config.frontend.address)
+        stateSub ! Connect(config.stateSub.address)
+        statePub ! Bind(config.statePub.address)
+        setTimer("heartbeat", Heartbeat, akka.util.Duration(1000L, TimeUnit.MILLISECONDS), true)
         stay
       }
     }
@@ -249,12 +288,8 @@ object BinaryStar {
     initialize
 
     override def preStart() {
-      voter ! Bind(config.frontend.address)
-      stateSub ! Connect(config.stateSub.address)
-      statePub ! Bind(config.statePub.address)
       super.preStart()
-      heartbeat.start
-      //setTimer("heartbeat", Heartbeat, heartbeatInterval, true)
+      self ! 'init
     }
   }
 }

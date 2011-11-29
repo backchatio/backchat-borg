@@ -26,8 +26,11 @@ object TestTelepathyServer {
   def apply(context: ZMQ.Context, poller: ZeroMQPoller, socketType: Int = ZMQ.XREP, name: String = ""): Server = {
     val socket = context.socket(socketType)
     val port = FreePort.randomFreePort(50)
-    val addr = TelepathAddress("127.0.0.1", Some(port))
-    socket.bind(addr.address)
+    val addr = TelepathAddress("127.0.0.1", port)
+    if (socketType == ZMQ.SUB) {
+      socket.connect(addr.address)
+      socket.subscribe("".getBytes(Utf8))
+    } else socket.bind(addr.address)
     name.toOption foreach { n => socket.setIdentity(n.getBytes(Utf8)) }
     socket.setLinger(0L)
     Server(socket, addr, poller, context)
@@ -44,7 +47,7 @@ object TestTelepathyServer {
       poller += socket -> fn
     }
 
-    def poll(timo: Long = -1) = poller.poll(timo)
+    def poll(interval: Duration) = poller poll interval.millis
   }
   
 }
@@ -182,7 +185,7 @@ class ClientSpec extends MojollySpecification { def is =
           }
   
           client ! Tell("target", appEvt)
-          server.poll(2000)
+          server poll 2.seconds
           latch.tryAwait(2, TimeUnit.SECONDS) must beTrue
         }
       }
@@ -204,7 +207,7 @@ class ClientSpec extends MojollySpecification { def is =
           }
   
           val req = client ? Ask("target", appEvt)
-          server.poll(2000)
+          server poll 2.seconds
           req.as[ApplicationEvent] must beSome(appEvt2)
         }
       }

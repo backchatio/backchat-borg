@@ -5,12 +5,15 @@ package telepathy
 package tests
 
 import mojolly.testing.{AkkaSpecification, MojollySpecification}
-import akka.actor.{Scheduler, Actor}
-import akka.testkit.{TestProbe, TestKit}
 import org.specs2.specification.{After, Fragments, Step}
+import org.zeromq.ZMQ
+import akka.actor.{ActorRef, Scheduler, Actor}
+import org.specs2.execute.Result
+import mojolly.io.FreePort
+import akka.testkit._
 
 trait ActorSpecification extends MojollySpecification {
-  override def map(fs: => Fragments) =  super.map(fs) ^ Step(Actor.registry.shutdownAll()) //^ Step(Scheduler.restart())
+  override def map(fs: => Fragments) =  super.map(fs) ^ Step(Actor.registry.shutdownAll()) // ^ Step(Scheduler.restart())
 }
 
 class BinaryStarSpec extends ActorSpecification { def is =
@@ -37,22 +40,48 @@ class BinaryStarSpec extends ActorSpecification { def is =
     
     def startAs: BinaryStar.BinaryStarRole
     val listener = TestProbe()
-    lazy val starConfig = BinaryStarConfig(
-      startAs,
-      TelepathAddress("tcp://127.0.0.1:5010"),
-      TelepathAddress("tcp://127.0.0.1:5011"),
-      TelepathAddress("tcp://127.0.0.1:5012"),
-      None)
 
-    lazy val star = Actor.actorOf(new Reactor(starConfig)).start()
+    lazy val port = FreePort.randomFreePort(50)
+    lazy val defaultVoter = TelepathAddress("127.0.0.1", port)
+    lazy val defaultSub = TelepathAddress("127.0.0.1", port + 1)
+    lazy val defaultPub = TelepathAddress("127.0.0.1", port + 2)
+    def withStar[T](voter: TelepathAddress = defaultVoter, stateSub: TelepathAddress = defaultSub, statePub: TelepathAddress = defaultPub)(fn: ActorRef => T)(implicit evidence$1: (T) => Result): T = {
+      val cfg = BinaryStarConfig(
+            startAs,
+            voter,
+            statePub,
+            stateSub,
+            None)
+      println("creating binary star with: %s" format cfg)
+      val st = Actor.actorOf(new Reactor(cfg)).start()
+      fn(st)
+    }
 
   }
   
-  class PrimaryBinaryStartContext extends BinaryStarContext {
+  class PrimaryBinaryStartContext extends BinaryStarContext with ZeroMqContext {
 
+    import BinaryStar._
+    import Messages._
     val startAs = BinaryStar.Primary
-    def sendsPeerPrimaryOnHeartbeat = {
-      pending
+
+    def sendsPeerPrimaryOnHeartbeat = this {
+      withServer(ZMQ.SUB) { server =>
+        sleep -> 500.millis
+        val latch = TestLatch()
+        server onMessage { frames =>
+          println("received frames on the server")
+          Messages(zmqMessage(frames)) match {
+            case PeerPrimary => latch.countDown()
+            case m => sys.error("Received unknown message: %s".format(m))
+          }
+        }
+        withStar(statePub = server.address) { star =>
+          star ! BinaryStar.Messages.Heartbeat
+          server.poll(2.seconds)
+          latch.await(TestLatch.DefaultTimeout) must beTrue
+        }
+      }
     }
     
   }
