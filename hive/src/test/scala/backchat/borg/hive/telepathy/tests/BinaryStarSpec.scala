@@ -11,26 +11,27 @@ import akka.actor.{ActorRef, Scheduler, Actor}
 import org.specs2.execute.Result
 import mojolly.io.FreePort
 import akka.testkit._
-import telepathy.BinaryStar.Messages.PeerBackup
+import telepathy.BinaryStar.Messages._
+import telepathy.Messages.Ping
 
 trait ActorSpecification extends MojollySpecification {
-  override def map(fs: => Fragments) =  super.map(fs) ^ Step(Actor.registry.shutdownAll()) // ^ Step(Scheduler.restart())
+  override def map(fs: => Fragments) =  super.map(fs) ^ Step(Actor.registry.shutdownAll()) ^ Step(Scheduler.restart())
 }
 
 class BinaryStarSpec extends ActorSpecification { def is =
   "A BinaryStar should" ^
     "when started as primary" ^
-      "send the appropriate state as heartbeat" ! primary.sendsPeerPrimaryOnHeartbeat ^ 
+      "send the appropriate state as heartbeat" ! primary.sendsPeerPrimaryOnHeartbeat ^
       "and a PeerBackup is received" ^
-        "notify the listener to activate" ! primary.notifiesListenerToActivate ^
+        "notify the listener to activate" ! primary.notifiesListenerToActivate(PeerBackup) ^
         "move to state active" ! primary.goesToActivate(PeerBackup) ^ bt ^
       "and a PeerActive is received" ^
-        "notify the listener to deactivate" ! pending ^
-        "move to state passive" ! pending ^ bt ^
+        "notify the listener to deactivate" ! primary.notifiesListenerToDeactivate ^
+        "move to state passive" ! primary.goesToPassive(PeerActive) ^ bt ^
       "and a client request is received" ^
-        "notify the listener to activate" ! pending ^
-        "move to state active" ! pending ^
-        "forward the message to the handler" ! pending ^ bt ^
+        "notify the listener to activate" ! primary.notifiesListenerToActivate(ClientRequest(Ping)) ^
+        "move to state active" ! primary.goesToActivate(ClientRequest(Ping)) ^
+        "forward the message to the handler" ! primary.forwardsRequest ^ bt ^
     "when started as backup" ^
       "send the appropriate state as heartbeat" ! pending ^ end
 
@@ -87,23 +88,35 @@ class BinaryStarSpec extends ActorSpecification { def is =
       }
     }
     
-    def notifiesListenerToActivate = this {
-      val probe = TestProbe()
-      val fsm = TestFSMRef(new Reactor(defaultConfig.copy(listener = Some(probe.ref))))
-      fsm.start()
-      fsm ! PeerBackup
-      (probe.receiveOne(2.seconds) must_== Active)
+    def notifiesListenerToActivate(msg: Any) = this {
+      val fsm = TestFSMRef(new Reactor(defaultConfig.copy(listener = Some(testActor)))).start
+      fsm ! msg
+      receiveOne(2.seconds) must_== Active
     }
 
-    def goesToActivate(msg: BinaryStarEvent) = this {
-      val probe = TestProbe()
-      val fsm = TestFSMRef(new Reactor(defaultConfig.copy(listener = Some(probe.ref))))
-      fsm.start()
+    def goesToActivate(msg: Any) = this {
+      val fsm = TestFSMRef(new Reactor(defaultConfig)).start
       fsm ! msg
       fsm.stateName must be_==(Active).eventually
     }
 
+    def goesToPassive(msg: Any) = this {
+      val fsm = TestFSMRef(new Reactor(defaultConfig)).start
+      fsm ! msg
+      fsm.stateName must be_==(Passive).eventually
+    }
 
+    def notifiesListenerToDeactivate = this {
+      val fsm = TestFSMRef(new Reactor(defaultConfig.copy(listener = Some(testActor)))).start
+      fsm ! PeerActive
+      receiveOne(2.seconds) must_== Passive
+    }
+    
+    def forwardsRequest = this {
+      val fsm = TestFSMRef(new Reactor(defaultConfig.copy(listener = Some(testActor)))).start
+      fsm ! ClientRequest(Ping)
+      receiveN(2, 2.seconds).last must_== Ping
+    }
     
   }
 }
