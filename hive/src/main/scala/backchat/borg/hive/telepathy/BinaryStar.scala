@@ -153,6 +153,7 @@ object BinaryStar {
    *   - a state subscriber socket (SUB)
    */
   class Reactor(config: BinaryStarConfig) extends Telepath with FSM[BinaryStarState, Unit] {
+    import FSM._
     import Messages._
 
     var nextPeerExpiry = schedulePeerExpiry
@@ -265,6 +266,12 @@ object BinaryStar {
         logger debug "[%s] Received heartbeat command".format(stateName)
         statePub ! deserializer.toZMQMessage(PeerPassive.unwrapped)
         stay
+      }
+    }
+    
+    onTransition {
+      case Passive -> Active => {
+        config.listener foreach { _ ! Active }
       }
     }
     

@@ -35,6 +35,7 @@ class BinaryStarSpec extends ActorSpecification { def is =
       `and a PeerActive is received`(backup) ^ bt ^
     "when running in Passive mode" ^
       sendsHearbeat(passive, PeerPassive) ^
+      "notify the listener to activate when transitioning to Active" ! passive.notifiesOnTransition ^
     "when running in Active mode" ^
       sendsHearbeat(active, PeerActive) ^ end
 
@@ -134,6 +135,11 @@ class BinaryStarSpec extends ActorSpecification { def is =
     import Messages._
     val startAs = BinaryStar.Passive
 
+    def notifiesOnTransition = {
+      val fsm = TestFSMRef(new Reactor(defaultConfig.copy(listener = Some(testActor)))).start
+      fsm ! PeerPrimary
+      receiveOne(2.seconds) must_== Active
+    }
   }
   
   class ActiveBinaryStarContext extends BinaryStarContext  {
