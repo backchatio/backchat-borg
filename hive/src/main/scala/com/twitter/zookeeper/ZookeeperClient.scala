@@ -12,7 +12,7 @@ import org.apache.zookeeper.Watcher.Event.KeeperState
 import java.util.concurrent.CountDownLatch
 
 class ZooKeeperClient(servers: String, sessionTimeout: Int, basePath: String,
-                      watcher: Option[ZooKeeperClient ⇒ Unit]) extends Logging {
+    watcher: Option[ZooKeeperClient ⇒ Unit]) extends Logging {
 
   @volatile
   private var zk: ZooKeeper = null
@@ -64,7 +64,7 @@ class ZooKeeperClient(servers: String, sessionTimeout: Int, basePath: String,
   }
 
   def sessionEvent(assignLatch: CountDownLatch, connectionLatch: CountDownLatch, event: WatchedEvent) {
-    logger debug  "Zookeeper event: %s".format(event)
+    logger debug "Zookeeper event: %s".format(event)
     assignLatch.await()
     event.getState match {
       case KeeperState.SyncConnected ⇒ {
@@ -232,12 +232,12 @@ class ZooKeeperClient(servers: String, sessionTimeout: Int, basePath: String,
    * the watchMap is modified
    */
   def watchChildrenWithData[T](node: String, watchMap: mutable.Map[String, T],
-                               deserialize: Array[Byte] ⇒ T, notifier: String ⇒ Unit) {
+    deserialize: Array[Byte] ⇒ T, notifier: String ⇒ Unit) {
     watchChildrenWithData(node, watchMap, deserialize, Some(notifier))
   }
 
   private def watchChildrenWithData[T](node: String, watchMap: mutable.Map[String, T],
-                                       deserialize: Array[Byte] ⇒ T, notifier: Option[String ⇒ Unit]) {
+    deserialize: Array[Byte] ⇒ T, notifier: Option[String ⇒ Unit]) {
     def nodeChanged(child: String)(childData: Option[Array[Byte]]) {
       childData match {
         case Some(data) ⇒ {

@@ -10,32 +10,32 @@ import java.util.concurrent.TimeUnit
 import mojolly.ScheduledTask
 
 object HiveTimer {
-  
-  private def r(thunk: => Any) = new Runnable {
+
+  private def r(thunk: ⇒ Any) = new Runnable {
     def run() { thunk }
   }
-  def apply(interval: Duration, receiver: ActorRef,  message: Any): HiveTimer = {
+  def apply(interval: Duration, receiver: ActorRef, message: Any): HiveTimer = {
     new HiveTimer(interval, r { receiver ! message }, 0.millis, true)
   }
 }
 case class HiveTimer(interval: Duration, task: Runnable, initialDelay: Duration = 0.seconds, repeat: Boolean = false) {
   private var _task: ScheduledTask = _
-  
+
   def isActive = _task.isNotNull && _task.isActive
   def isInactive = _task.isNull || _task.isInactive
-  
+
   def start = {
     val fut = if (repeat)
       Scheduler.schedule(task, initialDelay.millis, interval.millis, TimeUnit.MILLISECONDS)
-    else 
+    else
       Scheduler.scheduleOnce(task, interval.millis, TimeUnit.MILLISECONDS)
     _task = ScheduledTask(fut)
   }
-  
+
   def stop = {
     if (isActive) _task.stop()
   }
-  
+
   def restart = {
     stop
     start
@@ -43,21 +43,21 @@ case class HiveTimer(interval: Duration, task: Runnable, initialDelay: Duration 
 }
 
 case class BinaryStarConfig(
-             startAs: BinaryStar.BinaryStarState,
-             frontend: TelepathAddress,
-             statePub: TelepathAddress,
-             stateSub: TelepathAddress,
-             listener: Option[ActorRef] = None,
-             heartbeat: Duration = 1.second)
+  startAs: BinaryStar.BinaryStarState,
+  frontend: TelepathAddress,
+  statePub: TelepathAddress,
+  stateSub: TelepathAddress,
+  listener: Option[ActorRef] = None,
+  heartbeat: Duration = 1.second)
 
 object BinaryStar {
-  
-  trait Handler { self: Actor with Logging =>
+
+  trait Handler { self: Actor with Logging ⇒
     private var _isActive = false
     protected def isActive = _isActive
-    
+
     protected def handleBStarMessage: Receive = {
-      case Active => {
+      case Active ⇒ {
         if (!_isActive) {
           logger info "We just became master, activating server"
           _isActive = true
@@ -65,7 +65,7 @@ object BinaryStar {
           become(handleBStarMessage orElse receiveRequest, true)
         }
       }
-      case Passive => {
+      case Passive ⇒ {
         if (_isActive) {
           logger info "We just became a slave, deactivating server"
           become(handleBStarMessage, true)
@@ -73,13 +73,13 @@ object BinaryStar {
         }
       }
     }
-    
+
     protected def receiveRequest: Receive
-    
+
     protected def onActivate() {}
     protected def onDeactivate() {}
   }
-  
+
   sealed trait BinaryStarState {
 
     override def toString = { getClass.getSimpleName split "\\$" filter (_.nonEmpty) last }
@@ -104,43 +104,43 @@ object BinaryStar {
     case object PeerBackup extends BinaryStarEventImpl('backup)
     case object PeerActive extends BinaryStarEventImpl('active)
     case object PeerPassive extends BinaryStarEventImpl('passive)
-    
+
     sealed trait BinaryStarControlMessage
     case object Heartbeat extends BinaryStarControlMessage
-    case class ClientRequest(request: BorgMessageWrapper) extends BinaryStarControlMessage 
+    case class ClientRequest(request: BorgMessageWrapper) extends BinaryStarControlMessage
 
     def apply(msg: BorgMessage) = msg match {
-      case BorgMessage(MessageType.System, _, ApplicationEvent('primary, _), _, _) => PeerPrimary
-      case BorgMessage(MessageType.System, _, ApplicationEvent('backup, _), _, _) => PeerBackup
-      case BorgMessage(MessageType.System, _, ApplicationEvent('active, _), _, _) => PeerActive
-      case BorgMessage(MessageType.System, _, ApplicationEvent('passive, _), _, _) => PeerPassive
+      case BorgMessage(MessageType.System, _, ApplicationEvent('primary, _), _, _) ⇒ PeerPrimary
+      case BorgMessage(MessageType.System, _, ApplicationEvent('backup, _), _, _)  ⇒ PeerBackup
+      case BorgMessage(MessageType.System, _, ApplicationEvent('active, _), _, _)  ⇒ PeerActive
+      case BorgMessage(MessageType.System, _, ApplicationEvent('passive, _), _, _) ⇒ PeerPassive
     }
   }
-  
+
   class BinaryStarDeserializer extends BorgZMQMessageSerializer {
     override def apply(frames: Seq[Frame]) = {
       BinaryStar.Messages(fromZMQMessage(ZMQMessage(frames)))
     }
   }
-  
+
   class Voter(reactor: ActorRef) extends Actor with Logging {
     val serializer = new BorgZMQMessageSerializer
     protected def receive = {
-      case Connecting | Closed =>
-      case m: ZMQMessage => {
+      case Connecting | Closed ⇒
+      case m: ZMQMessage ⇒ {
         logger debug "voter received event"
         val msg = telepathy.Messages(serializer fromZMQMessage m)
         reactor ! Messages.ClientRequest(msg)
       }
     }
   }
-  
-//  class Reactor(fsm: ActorRef) extends Telepath {
-//    protected def receive = {
-//      case _ =>
-//    }
-//  }
-  
+
+  //  class Reactor(fsm: ActorRef) extends Telepath {
+  //    protected def receive = {
+  //      case _ =>
+  //    }
+  //  }
+
   /*
    * The binary star reactor links several components.
    * It takes a listener representing the server interface which will respond to cluster events
@@ -155,7 +155,7 @@ object BinaryStar {
 
     var nextPeerExpiry = schedulePeerExpiry
     def schedulePeerExpiry = DateTime.now + config.heartbeat.doubled
-    
+
     val deserializer = new BinaryStarDeserializer
     val statePub: ActorRef = newSocket(SocketType.Pub, MessageDeserializer(deserializer), SocketListener(stateListener))
     val stateSub: ActorRef = newSocket(SocketType.Sub, MessageDeserializer(deserializer), SocketListener(stateListener))
@@ -166,13 +166,13 @@ object BinaryStar {
       self startLink l
       l
     }
-    
+
     private lazy val stateListener = {
       val parent = self
       val l = Actor.actorOf(new Actor {
         def receive = {
-          case Connecting | Closed =>
-          case m: BinaryStarEvent => {
+          case Connecting | Closed ⇒
+          case m: BinaryStarEvent ⇒ {
             logger debug "state listener received an event: %s".format(m)
             nextPeerExpiry = schedulePeerExpiry
             parent ! m
@@ -182,27 +182,27 @@ object BinaryStar {
       self startLink l
       l
     }
-    
+
     startWith(config.startAs, ())
 
     when(Primary) {
-      case Ev(PeerBackup) => {
+      case Ev(PeerBackup) ⇒ {
         logger info "Connected to backup (slave), ready as master"
         config.listener foreach { _ ! Active }
         goto(Active)
       }
-      case Ev(PeerActive) => {
+      case Ev(PeerActive) ⇒ {
         logger info "Connected to backup (master), ready as slave"
         config.listener foreach { _ ! Passive }
         goto(Passive)
       }
-      case Ev(ClientRequest(request)) => {
+      case Ev(ClientRequest(request)) ⇒ {
         logger info "Request from client, ready as master"
         config.listener foreach { _ ! Active }
         config.listener foreach { _ forward request }
         goto(Active)
       }
-      case Ev(Heartbeat) => {
+      case Ev(Heartbeat) ⇒ {
         logger debug "[%s] Received heartbeat command".format(stateName)
         statePub ! deserializer.toZMQMessage(PeerPrimary.unwrapped)
         stay
@@ -210,15 +210,15 @@ object BinaryStar {
     }
 
     when(Backup) {
-      case Ev(PeerActive) => {
+      case Ev(PeerActive) ⇒ {
         logger info "Connected to primary (master), ready as slave"
         config.listener foreach { _ ! Passive }
         goto(Passive)
       }
-      case Ev(ClientRequest(request)) => { // perhaps forward to master?
+      case Ev(ClientRequest(request)) ⇒ { // perhaps forward to master?
         goto(Error)
       }
-      case Ev(Heartbeat) => {
+      case Ev(Heartbeat) ⇒ {
         logger debug "[%s] Received heartbeat command".format(stateName)
         statePub ! deserializer.toZMQMessage(PeerBackup.unwrapped)
         stay
@@ -226,11 +226,11 @@ object BinaryStar {
     }
 
     when(Active) {
-      case Ev(PeerActive) => {
+      case Ev(PeerActive) ⇒ {
         logger error "We have dual masters, confused"
         goto(Error)
       }
-      case Ev(Heartbeat) => {
+      case Ev(Heartbeat) ⇒ {
         logger debug "[%s] Received heartbeat command".format(stateName)
         statePub ! deserializer.toZMQMessage(PeerActive.unwrapped)
         stay
@@ -238,19 +238,19 @@ object BinaryStar {
     }
 
     when(Passive) {
-      case Ev(PeerPrimary) => {
+      case Ev(PeerPrimary) ⇒ {
         logger info "Primary (master) is restarting, becoming master"
         goto(Active)
       }
-      case Ev(PeerBackup) => {
+      case Ev(PeerBackup) ⇒ {
         logger info "Backup (slave) is restarting, becoming active"
         goto(Active)
       }
-      case Ev(PeerPassive) => {
+      case Ev(PeerPassive) ⇒ {
         logger error "We have dual slaves, confused"
         goto(Error)
       }
-      case Ev(ClientRequest(request)) => {
+      case Ev(ClientRequest(request)) ⇒ {
         require(nextPeerExpiry != null)
         require(nextPeerExpiry > MIN_DATE)
         if (DateTime.now >= nextPeerExpiry) {
@@ -260,21 +260,21 @@ object BinaryStar {
           goto(Error)
         }
       }
-      case Ev(Heartbeat) => {
+      case Ev(Heartbeat) ⇒ {
         logger debug "[%s] Received heartbeat command".format(stateName)
         statePub ! deserializer.toZMQMessage(PeerPassive.unwrapped)
         stay
       }
     }
-    
+
     onTransition {
-      case Passive -> Active => {
+      case Passive -> Active ⇒ {
         config.listener foreach { _ ! Active }
       }
     }
-    
+
     whenUnhandled {
-      case Ev('init) => {
+      case Ev('init) ⇒ {
         voter ! Bind(config.frontend.address)
         stateSub ! Connect(config.stateSub.address)
         statePub ! Bind(config.statePub.address)
@@ -282,14 +282,14 @@ object BinaryStar {
         stay
       }
     }
-    
+
     when(Error) {
-      case Ev(a) => {
+      case Ev(a) ⇒ {
         self.stop
         stay
       }
     }
-    
+
     initialize
 
     override def preStart() {

@@ -7,24 +7,24 @@ import Scalaz._
 import net.liftweb.json._
 import mojolly.Enum
 import borg.Protos.BorgPayload
-import com.google.protobuf.{Message, ByteString}
+import com.google.protobuf.{ Message, ByteString }
 
 trait MessageSerialization {
-  
+
   type ProtoBufMessage <: Message
-  
-  def toJValue: JValue 
+
+  def toJValue: JValue
   def toProtobuf: ProtoBufMessage
-  
+
   def toJson = toJValue.toString
-  def toBytes =  toProtobuf.toByteArray
+  def toBytes = toProtobuf.toByteArray
   def toByteString = toProtobuf.toByteString
-  
+
 }
 
 trait BorgMessageWrapper extends MessageSerialization {
   type ProtoBufMessage = Protos.BorgMessage
-  
+
   def unwrapped: BorgMessage
 
   def toJValue = unwrapped.toJValue
@@ -43,12 +43,12 @@ case class BorgMessage(messageType: BorgMessage.MessageType.EnumVal, target: Str
     sender foreach builder.setSender
     builder.build()
   }
-  
+
   private def pbPayload = {
     val b = BorgPayload.newBuilder.setAction(payload.action.name)
     payload.data match {
-      case JNothing => 
-      case d: JValue => b setData (ByteString copyFrom d.toJson.getBytes(Utf8))
+      case JNothing  ⇒
+      case d: JValue ⇒ b setData (ByteString copyFrom d.toJson.getBytes(Utf8))
     }
     b.build()
   }
@@ -82,10 +82,10 @@ object BorgMessage {
     }
 
     def apply(protocol: Protos.BorgMessage.MessageType) = protocol match {
-      case Protos.BorgMessage.MessageType.SYSTEM => System
-      case Protos.BorgMessage.MessageType.FIRE_FORGET => FireForget
-      case Protos.BorgMessage.MessageType.REQUEST_REPLY => RequestReply
-      case Protos.BorgMessage.MessageType.PUBSUB => PubSub
+      case Protos.BorgMessage.MessageType.SYSTEM        ⇒ System
+      case Protos.BorgMessage.MessageType.FIRE_FORGET   ⇒ FireForget
+      case Protos.BorgMessage.MessageType.REQUEST_REPLY ⇒ RequestReply
+      case Protos.BorgMessage.MessageType.PUBSUB        ⇒ PubSub
     }
 
   }
@@ -95,19 +95,19 @@ object BorgMessage {
   def apply(protocol: Protos.BorgMessage): BorgMessage = {
     new BorgMessage(
       MessageType(protocol.getMessageType),
-      protocol.getTarget, 
+      protocol.getTarget,
       applicationEvent(protocol.getPayload).get,
-      protocol.getSender.toOption, 
+      protocol.getSender.toOption,
       new Uuid(protocol.getCcid))
   }
-  
+
   def applicationEvent(protocol: Protos.BorgPayload): Option[ApplicationEvent] = {
     def action = Symbol(protocol.getAction)
     def data: JValue = JsonParser.parse(protocol.getData.toStringUtf8).camelizeKeys
     (protocol.hasAction, protocol.hasData) match {
-      case (false, _) => None
-      case (_, false) => ApplicationEvent(action).some
-      case (_, true) => ApplicationEvent(action, data).some
+      case (false, _) ⇒ None
+      case (_, false) ⇒ ApplicationEvent(action).some
+      case (_, true)  ⇒ ApplicationEvent(action, data).some
     }
   }
 }

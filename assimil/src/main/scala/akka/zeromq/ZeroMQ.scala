@@ -3,19 +3,18 @@
  */
 package akka.zeromq
 
-import akka.actor.{Actor, ActorRef}
-import akka.dispatch.{Dispatchers, MessageDispatcher}
+import akka.actor.{ Actor, ActorRef }
+import akka.dispatch.{ Dispatchers, MessageDispatcher }
 import akka.zeromq.SocketType._
 import akka.util.Duration
 import akka.util.duration._
 
 case class SocketParameters(
-  context: Context, 
-  socketType: SocketType, 
-  listener: Option[ActorRef] = None, 
+  context: Context,
+  socketType: SocketType,
+  listener: Option[ActorRef] = None,
   deserializer: Deserializer = new ZMQMessageDeserializer,
-  pollTimeoutDuration: Duration = 100 millis
-)
+  pollTimeoutDuration: Duration = 100 millis)
 
 object ZeroMQ {
   def newContext(numIoThreads: Int = 1) = {

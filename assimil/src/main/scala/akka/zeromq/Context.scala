@@ -3,7 +3,7 @@
  */
 package akka.zeromq
 
-import org.zeromq.{ZMQ => JZMQ}
+import org.zeromq.{ ZMQ ⇒ JZMQ }
 import akka.zeromq.SocketType._
 
 private[zeromq] class Context(numIoThreads: Int) {

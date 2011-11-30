@@ -3,7 +3,7 @@
  */
 package akka.zeromq
 
-import org.zeromq.{ZMQ => JZMQ}
+import org.zeromq.{ ZMQ ⇒ JZMQ }
 
 object SocketType extends Enumeration {
   type SocketType = Value

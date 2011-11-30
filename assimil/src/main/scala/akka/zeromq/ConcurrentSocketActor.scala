@@ -3,10 +3,10 @@
  */
 package akka.zeromq
 
-import akka.actor.{Actor, ReceiveTimeout}
+import akka.actor.{ Actor, ReceiveTimeout }
 import akka.dispatch.MessageDispatcher
-import org.zeromq.ZMQ.{Socket, Poller}
-import org.zeromq.{ZMQ => JZMQ}
+import org.zeromq.ZMQ.{ Socket, Poller }
+import org.zeromq.{ ZMQ ⇒ JZMQ }
 
 private[zeromq] class ConcurrentSocketActor(params: SocketParameters, dispatcher: MessageDispatcher) extends Actor {
 
@@ -18,22 +18,22 @@ private[zeromq] class ConcurrentSocketActor(params: SocketParameters, dispatcher
   self.dispatcher = dispatcher
 
   protected def receive: Receive = {
-    case Send(frames) =>
+    case Send(frames) ⇒
       sendFrames(frames)
       pollAndReceiveFrames()
-    case ZMQMessage(frames) => 
+    case ZMQMessage(frames) ⇒
       sendFrames(frames)
       pollAndReceiveFrames()
-    case Connect(endpoint) =>
+    case Connect(endpoint) ⇒
       socket.connect(endpoint)
       notifyListener(Connecting)
-    case Bind(endpoint) => 
+    case Bind(endpoint) ⇒
       socket.bind(endpoint)
-    case Subscribe(topic) => 
+    case Subscribe(topic) ⇒
       socket.subscribe(topic.toArray)
-    case Unsubscribe(topic) => 
+    case Unsubscribe(topic) ⇒
       socket.unsubscribe(topic.toArray)
-    case ReceiveTimeout =>
+    case ReceiveTimeout ⇒
       pollAndReceiveFrames()
   }
 
@@ -51,7 +51,7 @@ private[zeromq] class ConcurrentSocketActor(params: SocketParameters, dispatcher
     def sendBytes(bytes: Seq[Byte], flags: Int) {
       socket.send(bytes.toArray, flags)
     }
-    val iter = frames.iterator  
+    val iter = frames.iterator
     while (iter.hasNext) {
       val payload = iter.next.payload
       val flags = if (iter.hasNext) JZMQ.SNDMORE else 0
@@ -65,36 +65,36 @@ private[zeromq] class ConcurrentSocketActor(params: SocketParameters, dispatcher
     }
     if (pollSocket) {
       receiveFrames() match {
-        case Seq() =>
-        case frames => notifyListener(params.deserializer(frames))
+        case Seq()  ⇒
+        case frames ⇒ notifyListener(params.deserializer(frames))
       }
     }
   }
 
   private def receiveFrames(): Seq[Frame] = {
     @inline def receiveBytes(): Array[Byte] = socket.recv(0) match {
-      case null => noBytes
-      case bytes: Array[Byte] if bytes.length > 0 => bytes
-      case _ => noBytes
+      case null                                   ⇒ noBytes
+      case bytes: Array[Byte] if bytes.length > 0 ⇒ bytes
+      case _                                      ⇒ noBytes
     }
     receiveBytes() match {
-      case `noBytes` => Vector.empty
-      case someBytes =>
+      case `noBytes` ⇒ Vector.empty
+      case someBytes ⇒
         var frames = Vector(Frame(someBytes))
         while (socket.hasReceiveMore) receiveBytes() match {
-          case `noBytes` =>
-          case someBytes => frames :+= Frame(someBytes)
+          case `noBytes` ⇒
+          case someBytes ⇒ frames :+= Frame(someBytes)
         }
         frames
     }
   }
 
   private def notifyListener(message: Any) {
-    params.listener.foreach { listener =>
+    params.listener.foreach { listener ⇒
       if (listener.isShutdown)
         self.stop
       else
-        listener ! message 
+        listener ! message
     }
   }
 }

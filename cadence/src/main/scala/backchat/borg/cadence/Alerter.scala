@@ -21,8 +21,8 @@ class Alerter(config: AlerterConfig) extends Bootable with Logging {
 
   override def onLoad() {
     super.onLoad()
-    logger debug("polling %s every %d seconds: " format (config.url, config.period))
-    Scheduler schedule(() => run, 0, config.period, TimeUnit.SECONDS)
+    logger debug ("polling %s every %d seconds: " format (config.url, config.period))
+    Scheduler schedule (() ⇒ run, 0, config.period, TimeUnit.SECONDS)
   }
 
   override def onUnload() {
@@ -34,10 +34,10 @@ class Alerter(config: AlerterConfig) extends Bootable with Logging {
 
   def run {
     val req = (httpClient prepareGet requestUrl)
-    config.alerts foreach { a =>
-      req addQueryParameter("target", a.target)
+    config.alerts foreach { a ⇒
+      req addQueryParameter ("target", a.target)
     }
-    val resp = req execute() get()
+    val resp = req execute () get ()
     logger debug ("polling " + resp.getUri)
     val json = resp.getResponseBody
     logger debug ("response:" + json)
@@ -47,21 +47,21 @@ class Alerter(config: AlerterConfig) extends Bootable with Logging {
   def warn(a: Alert, m: Metric) = alertLogger warn ("warn threshold for %s passed" format a.target)
   def error(a: Alert, m: Metric) = alertLogger error ("error threshold for %s passed" format a.target)
 
-  def handle(resp:  GraphiteResponse) = {
-    logger debug("metric: "+resp.metrics)
-    resp.metrics foreach { m =>
-      config.alerts find (_.target == m.target) foreach { a =>
+  def handle(resp: GraphiteResponse) = {
+    logger debug ("metric: " + resp.metrics)
+    resp.metrics foreach { m ⇒
+      config.alerts find (_.target == m.target) foreach { a ⇒
         if (m.datapoints.size > 0) {
           val sum = (m.datapoints map (_.value)).sum
           val avg = sum / m.datapoints.size
-          logger debug("avg for %s: %s" format(a.target, avg))
+          logger debug ("avg for %s: %s" format (a.target, avg))
           avg match {
-            case e if avg > a.error => error(a, m)
-            case e if avg > a.warn => warn(a, m)
-            case _ =>
+            case e if avg > a.error ⇒ error(a, m)
+            case e if avg > a.warn  ⇒ warn(a, m)
+            case _                  ⇒
           }
         } else
-          logger debug("no data points for "+a.target)
+          logger debug ("no data points for " + a.target)
       }
     }
   }
@@ -70,22 +70,21 @@ class Alerter(config: AlerterConfig) extends Bootable with Logging {
 object Alerter {
   class AlerterConfig(key: String = "application") extends Configuration(ConfigurationContext(key)) with MetricsConfig {
     val applicationName = "Alerter"
-    val alerts = config.getSection("mojolly.borg.cadence.alerts") map { section =>
-      section.keys.map(_.split("\\.", 2)).map(_.head) map { k =>
+    val alerts = config.getSection("mojolly.borg.cadence.alerts") map { section ⇒
+      section.keys.map(_.split("\\.", 2)).map(_.head) map { k ⇒
         Alert(
           target = section.getString(k + ".graphitekeypattern").get,
           warn = section.getDouble(k + ".error").get,
-          error = section.getDouble(k + ".warn").get
-        )
+          error = section.getDouble(k + ".warn").get)
       }
-    }  getOrElse Nil
-    val url = "http://%s" format (reporting map(_.host) getOrElse "graphite")
+    } getOrElse Nil
+    val url = "http://%s" format (reporting map (_.host) getOrElse "graphite")
     val period = config.getSection("mojolly.reporting") flatMap { sect ⇒
       sect.getInt("pollInterval")
     } getOrElse 60
   }
 
-  case class Alert(target: String,  warn: Double, error: Double)
+  case class Alert(target: String, warn: Double, error: Double)
 
   case class GraphiteResponse(metrics: List[Metric])
   case class Metric(target: String, datapoints: List[Datapoint])
@@ -94,13 +93,13 @@ object Alerter {
   object GraphiteResponse {
     def apply(jsonString: String): Option[GraphiteResponse] = {
       parse(jsonString) match {
-        case JArray(metric) => Some(GraphiteResponse(metric collect {
-          case JObject(JField("target", JString(target)) :: JField("datapoints", JArray(datapoints)) :: Nil) =>
+        case JArray(metric) ⇒ Some(GraphiteResponse(metric collect {
+          case JObject(JField("target", JString(target)) :: JField("datapoints", JArray(datapoints)) :: Nil) ⇒
             Metric(target, datapoints collect {
-              case JArray(List(JDouble(v), JInt(timestamp))) => Datapoint(timestamp.toLong, v)
+              case JArray(List(JDouble(v), JInt(timestamp))) ⇒ Datapoint(timestamp.toLong, v)
             })
-          }))
-        case _ => None
+        }))
+        case _ ⇒ None
       }
     }
   }

@@ -177,7 +177,6 @@ trait ZooKeeperClusterManagerComponent extends ClusterManagerComponent {
       doIfConnectedWithZooKeeperWithResponse("a MarkNodeAvailable message", "marking node available") { zk ⇒
         val path = "%s/%d".format(AvailabilityNode, nodeId)
 
-        
         if (zk.exists(path, false).isNull) {
           ignoringIf(_.code == KeeperException.Code.NODEEXISTS) {
             zk.create(path, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL)
@@ -189,7 +188,7 @@ trait ZooKeeperClusterManagerComponent extends ClusterManagerComponent {
         None
       }
     }
-    
+
     private def deletePath(zk: ZooKeeper, path: String) {
       if (zk.exists(path, false).isNotNull) {
         ignoringIf(_.code == KeeperException.Code.NONODE) {
@@ -210,9 +209,9 @@ trait ZooKeeperClusterManagerComponent extends ClusterManagerComponent {
       }
     }
 
-    private def ignoringIf[T](predicate: KeeperException => Boolean)(body: => T)(implicit z: Zero[T]): T = {
+    private def ignoringIf[T](predicate: KeeperException ⇒ Boolean)(body: ⇒ T)(implicit z: Zero[T]): T = {
       val catcher: Catcher[T] = {
-        case ex: KeeperException if predicate(ex) => z.zero
+        case ex: KeeperException if predicate(ex) ⇒ z.zero
       }
       catching(catcher) apply body
     }
@@ -226,15 +225,15 @@ trait ZooKeeperClusterManagerComponent extends ClusterManagerComponent {
           logger info "ZooKeeperClusterManager shut down"
           self.stop()
         }) {
-        watcher.shutdown()
-        zooKeeper.foreach(_.close())
-      }
+          watcher.shutdown()
+          zooKeeper.foreach(_.close())
+        }
     }
 
     private def startZooKeeper() {
       zooKeeper = (handling(classOf[Exception]) by {
-        case e: IOException => logger error ("Unable to connect to ZooKeeper", e); None
-        case e: Exception => logger error ("Exception while connecting to ZooKeeper", e); None
+        case e: IOException ⇒ logger error ("Unable to connect to ZooKeeper", e); None
+        case e: Exception   ⇒ logger error ("Exception while connecting to ZooKeeper", e); None
       }) {
         watcher = new ClusterWatcher(self)
         val zk = zooKeeperFactory(connectString, sessionTimeout, watcher)
@@ -245,14 +244,14 @@ trait ZooKeeperClusterManagerComponent extends ClusterManagerComponent {
 
     private def verifyZooKeeperStructure(zk: ZooKeeper) {
       logger.debug("Verifying ZooKeeper structure...")
-      
+
       Nodes foreach { path ⇒
         ignoringIf(_.code() == KeeperException.Code.NODEEXISTS) {
           logger.debug("Ensuring %s exists".format(path))
           if (zk.exists(path, false).isNull) {
             logger.debug("%s doesn't exist, creating".format(path))
             zk.create(path, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT)
-          };()  // return Unit and save a cheerleader
+          }; () // return Unit and save a cheerleader
         }
       }
     }
@@ -284,8 +283,8 @@ trait ZooKeeperClusterManagerComponent extends ClusterManagerComponent {
     }
 
     private def doWithZooKeeper(what: String)(block: ZooKeeper ⇒ Unit) {
-      zooKeeper some { zk =>
-        ((handling(classOf[KeeperException]) by (logger.error("ZooKeeper threw an exception",_))) or
+      zooKeeper some { zk ⇒
+        ((handling(classOf[KeeperException]) by (logger.error("ZooKeeper threw an exception", _))) or
           (handling(classOf[Exception]) by (logger.error("Unhandled exception while working with ZooKeeper", _)))){ block(zk) }
       } none {
         logger.error(
@@ -307,9 +306,9 @@ trait ZooKeeperClusterManagerComponent extends ClusterManagerComponent {
         doWithZooKeeper(what) { zk ⇒
           val response =
             ((handling(classOf[KeeperException]) by (new ClusterException("Error while %s".format(exceptionDescription), _).some)) or
-            (handling(classOf[Exception]) by (new ClusterException("Unexpected exception while  %s".format(exceptionDescription), _).some))) {
-              block(zk)
-            }
+              (handling(classOf[Exception]) by (new ClusterException("Unexpected exception while  %s".format(exceptionDescription), _).some))) {
+                block(zk)
+              }
 
           self tryReply ClusterManagerResponse(response)
         }

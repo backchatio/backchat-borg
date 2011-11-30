@@ -3,16 +3,15 @@
  */
 package akka.zeromq
 
-import akka.actor.{Actor, ActorRef}
-import akka.dispatch.{Dispatchers, MessageDispatcher}
+import akka.actor.{ Actor, ActorRef }
+import akka.dispatch.{ Dispatchers, MessageDispatcher }
 import akka.zeromq.SocketType._
 import akka.util.Duration
 import akka.util.duration._
-import org.joda.time.{ Duration => JodaDuration }
-
+import org.joda.time.{ Duration ⇒ JodaDuration }
 
 case class SocketParameters(
-  context: Context, 
+  context: Context,
   socketType: SocketType,
   listener: Option[ActorRef] = None,
   deserializer: Deserializer = new ZMQMessageDeserializer,

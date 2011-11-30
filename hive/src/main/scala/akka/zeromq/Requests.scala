@@ -32,7 +32,7 @@ case class ZMQMessage(frames: Seq[Frame]) {
     new String(frames.head.payload.toArray)
   }
 }
-object ZMQMessage { 
+object ZMQMessage {
   def apply(bytes: Array[Byte]): ZMQMessage = {
     ZMQMessage(Seq(Frame(bytes)))
   }

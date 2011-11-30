@@ -14,11 +14,7 @@ import akka.testkit._
 import telepathy.BinaryStar.Messages._
 import telepathy.Messages.Ping
 
-trait ActorSpecification extends MojollySpecification {
-  override def map(fs: => Fragments) =  super.map(fs) ^ Step(Actor.registry.shutdownAll()) ^ Step(Scheduler.restart())
-}
-
-class BinaryStarSpec extends ActorSpecification { def is =
+class BinaryStarSpec extends AkkaSpecification { def is =
   "A BinaryStar should" ^
     "when started as primary" ^ t ^
       sendsHearbeat(primary, PeerPrimary) ^

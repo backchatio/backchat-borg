@@ -18,7 +18,7 @@ trait Telepath extends Actor with Logging {
 
   lazy val context = ZeroMQ.newContext()
 
-  def socketListener:Option[ActorRef] = self.some
+  def socketListener: Option[ActorRef] = self.some
   implicit def osa2oa(opt: Option[ScalaActorRef]): Option[ActorRef] = opt map (_.asInstanceOf[ActorRef])
 
   protected def newSocket(socketType: SocketType.Value, options: SocketOption*) = {
@@ -27,8 +27,8 @@ trait Telepath extends Actor with Logging {
     val listener: Option[ActorRef] = options find (_.isInstanceOf[SocketListener]) map (_.asInstanceOf[SocketListener].value) orElse Some(self)
     val timeo = akka.util.Duration(socketTimeout, TimeUnit.MILLISECONDS)
     val realOptions = options filterNot {
-      case _:Timeout | _:MessageDeserializer | _: SocketListener => true
-      case _ => false
+      case _: Timeout | _: MessageDeserializer | _: SocketListener ⇒ true
+      case _ ⇒ false
     }
     val params = SocketParameters(
       context,
@@ -46,17 +46,16 @@ object TelepathAddress {
     val auth = uri.authority.get
     TelepathAddress(auth.host.value, auth.port, uri.scheme.scheme)
   }
-  
+
   def apply(host: String, port: Int): TelepathAddress = {
     TelepathAddress(host, Some(port))
   }
 
   def apply(host: String, port: Int, protocol: String): TelepathAddress = {
-      TelepathAddress(host, Some(port), protocol)
-    }
+    TelepathAddress(host, Some(port), protocol)
+  }
 }
 case class TelepathAddress(host: String, port: Option[Int], protocol: String = "tcp") {
   def address = "%s://%s%s" format (protocol, host, port some (":%d" format _) none "")
 }
-
 

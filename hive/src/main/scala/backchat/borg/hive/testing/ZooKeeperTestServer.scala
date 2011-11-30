@@ -8,7 +8,7 @@ import org.apache.zookeeper.server.persistence.FileTxnSnapLog
 import org.apache.zookeeper.server.ZooKeeperServer.BasicDataTreeBuilder
 import org.apache.zookeeper.server.{ NIOServerCnxnFactory, ZooKeeperServer, ServerCnxnFactory }
 import java.net.InetSocketAddress
-import mojolly.io.{FreePort, TempDir}
+import mojolly.io.{ FreePort, TempDir }
 
 class NoRandomPortAvailableException extends Exception
 

@@ -44,7 +44,7 @@ object Node {
     builder.setId(node.id).setUrl(node.url)
     node.partitionIds.foreach(builder.addPartition(_))
     node.stateUrl foreach builder.setStateUrl
-    node.pubsubUrl foreach  builder.setPubsubUrl
+    node.pubsubUrl foreach builder.setPubsubUrl
 
     builder.build.toByteArray
   }

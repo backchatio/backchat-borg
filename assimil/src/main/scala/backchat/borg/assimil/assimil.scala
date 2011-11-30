@@ -3,7 +3,7 @@ package backchat.borg
 import org.zeromq.{ ZMQ ⇒ JZMQ }
 import akka.actor.Uuid
 
-package object assimil  {
+package object assimil {
 
   type ZMQ = JZMQ
   type Socket = JZMQ.Socket
