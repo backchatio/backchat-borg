@@ -32,11 +32,14 @@ class BinaryStarSpec extends ActorSpecification { def is =
         "forward the message to the handler" ! primary.forwardsRequest ^ bt ^ bt ^
     "when started as backup" ^ t ^
       sendsHearbeat(backup, PeerBackup) ^
-      `and a PeerActive is received`(backup) ^ bt ^
-    "when running in Passive mode" ^
+      `and a PeerActive is received`(backup) ^
+      "shuts down on error" ! backup.shutsDownOn(ClientRequest(Ping)) ^ bt ^
+    "when running in Passive mode" ^ t ^
       sendsHearbeat(passive, PeerPassive) ^
       "notify the listener to activate when transitioning to Active" ! passive.notifiesOnTransition ^
-    "when running in Active mode" ^
+      "shuts down on error" ! passive.shutsDownOn(PeerPassive) ^ bt ^
+    "when running in Active mode" ^ t ^
+      "shuts down on error" ! active.shutsDownOn(PeerActive) ^
       sendsHearbeat(active, PeerActive) ^ end
 
 
@@ -120,6 +123,14 @@ class BinaryStarSpec extends ActorSpecification { def is =
       val fsm = TestFSMRef(new Reactor(defaultConfig.copy(listener = Some(testActor)))).start
       fsm ! PeerActive
       receiveOne(2.seconds) must_== Passive
+    }
+    
+    def shutsDownOn(events: Any*) = this {
+      events map { ev =>
+        val fsm = TestFSMRef(new Reactor(defaultConfig.copy(listener = Some(testActor)))).start
+        fsm ! ev
+        fsm.isShutdown must beTrue.eventually
+      } reduce (_ and _)
     }
 
   }

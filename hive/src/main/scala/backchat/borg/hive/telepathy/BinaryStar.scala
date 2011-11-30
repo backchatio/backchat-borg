@@ -6,11 +6,8 @@ package telepathy
 import akka.actor._
 import akka.zeromq._
 import borg.BorgMessage.MessageType
-import net.liftweb.json._
-import telepathy.Messages.{Tell, HiveRequest, Ask}
 import java.util.concurrent.TimeUnit
-import mojolly.{ScheduledTask, BackchatFormats}
-import telepathy.BinaryStar.Voter
+import mojolly.ScheduledTask
 
 object HiveTimer {
   
@@ -157,7 +154,7 @@ object BinaryStar {
     import Messages._
 
     var nextPeerExpiry = schedulePeerExpiry
-    def schedulePeerExpiry = System.currentTimeMillis + (2 * config.heartbeat.millis)
+    def schedulePeerExpiry = DateTime.now + config.heartbeat.doubled
     
     val deserializer = new BinaryStarDeserializer
     val statePub: ActorRef = newSocket(SocketType.Pub, MessageDeserializer(deserializer), SocketListener(stateListener))
@@ -219,7 +216,7 @@ object BinaryStar {
         goto(Passive)
       }
       case Ev(ClientRequest(request)) => { // perhaps forward to master?
-        stay
+        goto(Error)
       }
       case Ev(Heartbeat) => {
         logger debug "[%s] Received heartbeat command".format(stateName)
@@ -251,11 +248,12 @@ object BinaryStar {
       }
       case Ev(PeerPassive) => {
         logger error "We have dual slaves, confused"
-        stay
+        goto(Error)
       }
       case Ev(ClientRequest(request)) => {
-        require(nextPeerExpiry > 0)
-        if (System.currentTimeMillis >= nextPeerExpiry) {
+        require(nextPeerExpiry != null)
+        require(nextPeerExpiry > MIN_DATE)
+        if (DateTime.now >= nextPeerExpiry) {
           logger info "Failover succeeded, ready as master"
           goto(Active)
         } else {
@@ -297,6 +295,11 @@ object BinaryStar {
     override def preStart() {
       super.preStart()
       self ! 'init
+    }
+
+    override def postStop() {
+      super.postStop()
+      config.listener filter (_.isRunning) foreach { _ ! Passive }
     }
   }
 }
