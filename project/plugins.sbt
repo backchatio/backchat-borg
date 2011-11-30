@@ -6,4 +6,4 @@ resolvers += Resolver.url("BackChat.IO plugin snapshots", url("https://artifacto
 
 addSbtPlugin("com.mojolly.sbt" % "backchat-sbt" % "0.0.35-SNAPSHOT")
 
-addSbtPlugin("com.github.gseitz" % "sbt-protobuf" % "0.2.1")
+addSbtPlugin("com.github.gseitz" % "sbt-protobuf" % "0.2")

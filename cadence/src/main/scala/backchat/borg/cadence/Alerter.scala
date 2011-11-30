@@ -6,6 +6,7 @@ import com.ning.http.client.AsyncHttpClient
 import java.util.concurrent.TimeUnit
 import net.liftweb.json._
 import mojolly._
+import config.{ ConfigurationContext, MojollyConfig }
 import metrics.MetricsConfig
 import akka.actor.Scheduler
 import akka.util.Bootable
@@ -68,7 +69,7 @@ class Alerter(config: AlerterConfig) extends Bootable with Logging {
 }
 
 object Alerter {
-  class AlerterConfig(key: String = "application") extends Configuration(ConfigurationContext(key)) with MetricsConfig {
+  class AlerterConfig(key: String = "application") extends MojollyConfig(ConfigurationContext(key)) with MetricsConfig {
     val applicationName = "Alerter"
     val alerts = config.getSection("mojolly.borg.cadence.alerts") map { section ⇒
       section.keys.map(_.split("\\.", 2)).map(_.head) map { k ⇒
