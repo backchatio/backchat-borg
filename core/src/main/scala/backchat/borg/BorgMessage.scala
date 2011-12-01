@@ -13,7 +13,7 @@ trait MessageSerialization {
 
   type ProtoBufMessage <: Message
 
-  def toJValue: JValue
+  def toJValue = Extraction.decompose(this)
   def toProtobuf: ProtoBufMessage
 
   def toJson = toJValue.toString
@@ -27,7 +27,7 @@ trait BorgMessageWrapper extends MessageSerialization {
 
   def unwrapped: BorgMessage
 
-  def toJValue = unwrapped.toJValue
+  override def toJValue = unwrapped.toJValue
 
   def toProtobuf = unwrapped.toProtobuf
 }
@@ -36,7 +36,6 @@ case class BorgMessage(messageType: BorgMessage.MessageType.EnumVal, target: Str
 
   type ProtoBufMessage = Protos.BorgMessage
 
-  def toJValue = Extraction.decompose(this)
   def toProtobuf: Protos.BorgMessage = {
     val builder = Protos.BorgMessage.newBuilder()
     builder.setMessageType(messageType.pbType).setTarget(target).setPayload(pbPayload).setCcid(ccid.toString)

@@ -9,6 +9,7 @@ import org.apache.zookeeper.server.ZooKeeperServer.BasicDataTreeBuilder
 import org.apache.zookeeper.server.{ NIOServerCnxnFactory, ZooKeeperServer, ServerCnxnFactory }
 import java.net.InetSocketAddress
 import mojolly.io.{ FreePort, TempDir }
+import com.twitter.zookeeper.ZooKeeperClient
 
 class NoRandomPortAvailableException extends Exception
 
@@ -59,14 +60,15 @@ class ZooKeeperTestServer(sessionTimeout: Duration = 100.millis, maxRetries: Int
     }
   }
 
-  //  def newClient(sessionTimeout: Duration = 3.seconds) = {
-  //    require(started, "The server needs to be started to spawn clients")
-  //    val cl = new ZooKeeperClient("127.0.0.1:%s".format(port))
-  //    shutDownActions += { () ⇒ cl.close() }
-  //    cl
-  //  }
-  //
-  //  def expireClientSession(client: ZooKeeperClient) {
-  //    zookeeperServer.closeSession(client.getHandle.getSessionId)
-  //  }
+  def newClient(sessionTimeout: Duration = 3.seconds) = {
+    require(started, "The server needs to be started to spawn clients")
+    val cl = new ZooKeeperClient("127.0.0.1:%s".format(port))
+    //    shutDownActions += { () ⇒ if (cl.isAlive) cl.close() }
+    cl.connect()
+    cl
+  }
+
+  def expireClientSession(client: ZooKeeperClient) {
+    zookeeperServer.closeSession(client.getHandle.getSessionId)
+  }
 }

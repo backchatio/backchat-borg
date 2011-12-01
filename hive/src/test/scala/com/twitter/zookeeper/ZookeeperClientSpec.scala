@@ -8,9 +8,10 @@ import org.apache.zookeeper.data.Id
 import scala.collection.mutable
 import backchat.borg.hive.{ZooKeeperClientContext, ZooKeeperSpecification}
 import mojolly.testing.TimeHelpers
+import backchat.borg.hive.testing.ZooKeeperTestServer
 
 
-class ZooKeeperClientSpec extends ZooKeeperSpecification {
+class  ZooKeeperClientSpec extends ZooKeeperSpecification {
   
   def is = 
     "A ZooKeeperClient should" ^
@@ -26,9 +27,9 @@ class ZooKeeperClientSpec extends ZooKeeperSpecification {
       end
 
 
-  def specify = ZooKeeperSpecContext(zookeeperServer.port)
+  def specify = ZooKeeperSpecContext(zookeeperServer)
 
-  case class ZooKeeperSpecContext(port: Int) extends ZooKeeperClientContext(port) with TimeHelpers {
+  case class ZooKeeperSpecContext(server: ZooKeeperTestServer) extends ZooKeeperClientContext(server) with TimeHelpers {
 
     def instantiatesWithFake = this { zkClient must not beNull }
     

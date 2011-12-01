@@ -8,7 +8,6 @@ import akka.dispatch.MessageDispatcher
 import org.zeromq.ZMQ.{ Socket, Poller }
 import org.zeromq.{ ZMQ ⇒ JZMQ }
 import java.nio.charset.Charset
-import akka.event.EventHandler
 
 private[zeromq] class ConcurrentSocketActor(params: SocketParameters, dispatcher: MessageDispatcher) extends Actor {
 

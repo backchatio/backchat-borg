@@ -29,6 +29,7 @@ trait StringSocketOption extends SocketOption { type OptionType = String }
 trait BoolSocketOption extends SocketOption { type OptionType = Boolean }
 trait DeserializerSocketOption extends SocketOption { type OptionType = Deserializer }
 trait ActorRefSocketOption extends SocketOption { type OptionType = ActorRef }
+
 abstract class LingerOption(val value: Long) extends LongSocketOption
 case class Linger(override val value: Long) extends LingerOption(value)
 case object NoLinger extends LingerOption(0)
@@ -40,6 +41,7 @@ case class SndBuf(value: Long) extends LongSocketOption
 case class RcvBuf(value: Long) extends LongSocketOption
 case class Identity(value: String) extends StringSocketOption
 case class McastLoop(value: Boolean) extends BoolSocketOption
+
 object Timeout {
   def apply(value: JodaDuration): Timeout = new Timeout(value.getMillis)
   def apply(value: Duration): Timeout = new Timeout(value.toMillis)

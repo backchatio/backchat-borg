@@ -7,16 +7,8 @@ import com.twitter.zookeeper.{ ZooKeeperClient, ZooKeeperClientConfig }
 import org.specs2.specification.{ Step, After, Fragments }
 import mojolly.testing.{ MojollySpecification, AkkaSpecification }
 
-trait ZooKeeperActorSpecification extends AkkaSpecification {
+trait ZooKeeperActorSpecification extends AkkaSpecification with ZooKeeperSpecification
 
-  val zookeeperServer = new ZooKeeperTestServer()
-
-  private def startZookeeper = zookeeperServer.start()
-  private def stopZookeeper = zookeeperServer.stop()
-
-  override def map(fs: ⇒ Fragments) = Step(startZookeeper) ^ super.map(fs) ^ Step(stopZookeeper) ^ Step(Actor.registry.shutdownAll())
-
-}
 trait ZooKeeperSpecification extends MojollySpecification {
   val zookeeperServer = new ZooKeeperTestServer()
   override def map(fs: ⇒ Fragments) = Step(zookeeperServer.start()) ^ super.map(fs) ^ Step(zookeeperServer.stop())
@@ -24,13 +16,13 @@ trait ZooKeeperSpecification extends MojollySpecification {
   def specify: ZooKeeperClientContext
 }
 
-abstract class ZooKeeperClientContext(port: Int) extends After {
+abstract class ZooKeeperClientContext(server: ZooKeeperTestServer) extends After {
   val config = new ZooKeeperClientConfig {
-    def hostList = "localhost:%s" format port
+    def hostList = "localhost:%s" format server.port
   }
   val hostlist = config.hostList
 
-  val zkClient = new ZooKeeperClient(config)
+  val zkClient = server.newClient()
   zkClient.connect()
   private var _afters = List[() ⇒ Any]()
 
@@ -38,7 +30,9 @@ abstract class ZooKeeperClientContext(port: Int) extends After {
     _afters ::= (() ⇒ fn)
   }
 
-  doAfter { zkClient.close() }
+  doAfter {
+    server.expireClientSession(zkClient)
+  }
   def after = {
     _afters foreach (_.apply)
   }
