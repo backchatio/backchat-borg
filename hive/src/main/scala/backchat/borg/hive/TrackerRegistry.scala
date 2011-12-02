@@ -13,6 +13,12 @@ import akka.stm._
 import akka.routing.{ Deafen, Listen, Listeners }
 
 trait TrackerRegistryListener {
+
+  def condition(node: TrackerRegistry.TrackerNode) = true
+  def ifConditionValid(node: TrackerRegistry.TrackerNode)(thunk: TrackerRegistry.TrackerNode ⇒ Any) {
+    if (condition(node)) thunk(node)
+  }
+
   def onTrackerAdded(node: TrackerRegistry.TrackerNode) {
 
   }
@@ -77,9 +83,9 @@ object TrackerRegistry {
   private def wrapInActor(list: TrackerRegistryListener) = {
     actorOf(new Actor {
       protected def receive = {
-        case Messages.TrackerAdded(node)   ⇒ list onTrackerAdded node
-        case Messages.TrackerUpdated(node) ⇒ list onTrackerUpdated node
-        case Messages.TrackerRemoved(node) ⇒ list onTrackerRemoved node
+        case Messages.TrackerAdded(node)   ⇒ list.ifConditionValid(node) { list onTrackerAdded _ }
+        case Messages.TrackerUpdated(node) ⇒ list.ifConditionValid(node) { list onTrackerUpdated _ }
+        case Messages.TrackerRemoved(node) ⇒ list.ifConditionValid(node) { list onTrackerRemoved _ }
       }
     }).start()
   }
