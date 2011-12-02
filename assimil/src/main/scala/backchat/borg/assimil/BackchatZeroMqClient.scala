@@ -6,6 +6,7 @@ import akka.actor._
 import org.zeromq.ZMQ.Poller
 import Messages._
 import collection.immutable.SortedSet
+import assimil.ReliableClientBroker.AvailableServers
 
 trait ZmqClient {
 
@@ -125,6 +126,9 @@ trait ClientActorBridge extends ZeroMQDevicePart with OnReady { self: ZeroMQDevi
 }
 
 object ReliableClientBroker {
+  object AvailableServers {
+    def apply(servers: (String, AvailableServer)*) = new AvailableServers(servers:_*)
+  }
   class AvailableServers(servers: Map[String, AvailableServer]) extends Map[String, AvailableServer] {
     def this(srvrs: (String, AvailableServer)*) = this(Map(srvrs: _*))
     private val ss = servers

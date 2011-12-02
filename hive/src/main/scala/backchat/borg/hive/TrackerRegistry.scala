@@ -10,6 +10,7 @@ import collection.mutable
 import collection.JavaConversions._
 import com.twitter.zookeeper.{ ZooKeeperClient, ZooKeeperClientConfig }
 import akka.routing.Listeners
+import org.apache.zookeeper.CreateMode
 
 object TrackerRegistry {
 
@@ -52,7 +53,7 @@ object TrackerRegistry {
     val data = new mutable.HashMap[String, TrackerNode]()
     val zk = new ZooKeeperClient(config)
     zk.connect()
-    zk.watchChildrenWithData[TrackerNode]("/trackers", data, readBytes _, (s: String) ⇒ logger.debug(s))
+    zk.watchChildrenWithData[TrackerNode](config.rootNode, data, readBytes _, (s: String) ⇒ logger.debug(s))
 
     private def readBytes(bytes: Array[Byte]) = {
       val n = TrackerNode(bytes)
@@ -63,9 +64,24 @@ object TrackerRegistry {
     protected def receive = listenerManagement orElse nodeManagement
 
     protected def nodeManagement: Receive = {
-      case GetTracker(trackerId) ⇒ self tryReply data.get(trackerId)
-      case SetTracker(node)      ⇒ zk.set("/trackers/" + node.id, node.toBytes)
+      case GetTracker(trackerId) ⇒ {
+        logger debug "Fetching: %s, The keys: %s".format(trackerId, data.keys.mkString(", "))
+        val fetched = data.get(trackerId)
+        logger debug "Fetched: %s".format(fetched)
+        self tryReply fetched
+      }
+      case SetTracker(nod) ⇒ {
+        if (zk.exists(node(nod)))
+          zk.set(node(nod), nod.toBytes)
+        else
+          zk.create(node(nod), nod.toBytes, CreateMode.EPHEMERAL)
+      }
+      case 'init ⇒
     }
+
+    private def node(nod: TrackerNode) =
+      if (config.rootNode.endsWith("/")) config.rootNode + nod.id
+      else config.rootNode + "/" + nod.id
 
   }
 

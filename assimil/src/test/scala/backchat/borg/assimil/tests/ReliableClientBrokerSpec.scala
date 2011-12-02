@@ -389,7 +389,7 @@ class ReliableClientBrokerSpec extends WordSpec with MustMatchers with BeforeAnd
       }))
       val dev = ZeroMQ startDevice {
         new BackchatZeroMqDevice(config) with ClientActorBridge with ReliableClientBroker {
-          availableServers = new AvailableServers(Map((name + "-endpoint") -> AvailableServer(config.serverAddress, 1.second)))
+          availableServers = AvailableServers((name + "-endpoint") -> AvailableServer(config.serverAddress, 1.second))
           override def init() {
             super.init()
             brokerLatch.open()

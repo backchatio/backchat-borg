@@ -16,10 +16,12 @@ trait ZooKeeperSpecification extends MojollySpecification {
   def specify: ZooKeeperClientContext
 }
 
-abstract class ZooKeeperClientContext(server: ZooKeeperTestServer) extends After {
+abstract class ZooKeeperClientContext(server: ZooKeeperTestServer, root: String = "") extends After {
   val config = new ZooKeeperClientConfig {
     def hostList = "localhost:%s" format server.port
+    override val rootNode = root
   }
+
   val hostlist = config.hostList
 
   val zkClient = server.newClient()
@@ -30,10 +32,8 @@ abstract class ZooKeeperClientContext(server: ZooKeeperTestServer) extends After
     _afters ::= (() ⇒ fn)
   }
 
-  doAfter {
-    server.expireClientSession(zkClient)
-  }
   def after = {
     _afters foreach (_.apply)
+    server.expireClientSession(zkClient)
   }
 }
