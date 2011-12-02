@@ -3,23 +3,22 @@ package borg
 package hive
 package tests
 
-import mojolly.testing.AkkaSpecification
 import akka.testkit._
 import akka.actor._
 import Actor.actorOf
 import hive.TrackerRegistry.TrackerNode
 import org.apache.zookeeper.CreateMode
 import util.Random
-import akka.routing.{WithListeners, Listen}
 import java.util.concurrent.{CountDownLatch, TimeUnit}
 
 class TrackerRegistrySpec extends ZooKeeperActorSpecification {
 
-  def is = sequential ^
+  def is = //sequential ^
     "A tracker registry should" ^
       "fill the registry at startup" ! specify.getTheInitialStateForSubtree ^
       "get a key from the registry" ! specify.getsNodeForKey ^
       "set a key in the registry" ! specify.setsKey ^
+      "updates a key in the registry" ! specify.updatesKey ^
       "notify listeners of value updated" ! specify.notifiesListeners ^
       "keep the registry in sync with network changes" ! specify.syncsWithNetwork ^
     end
@@ -33,6 +32,7 @@ class TrackerRegistrySpec extends ZooKeeperActorSpecification {
     val tracker3 = TrackerNode("tracker-3", "xmpp", Seq("gtalk"), 3)
     val tracker4 = TrackerNode("tracker-4", "twitter", Seq("oauth"), 4)
     val tracker5 = TrackerNode("tracker-5", "twitter", Seq("oauth"), 5)
+    val tracker6 = TrackerNode("tracker-3", "email", Seq("smtp"), 3)
 
     doAfter {
       zkClient.deleteRecursive(rootNode)
@@ -62,10 +62,8 @@ class TrackerRegistrySpec extends ZooKeeperActorSpecification {
       TrackerRegistry.get(tracker2.id) must beSome(tracker2)
     }
 
-    def notifiesListeners = {
-      awaitInit
-    }
-
+    def notifiesListeners = awaitInit
+    
     var lastNode: TrackerNode = null
     private def awaitInit = {
       lastNode = null
@@ -89,6 +87,12 @@ class TrackerRegistrySpec extends ZooKeeperActorSpecification {
       awaitInit
       TrackerRegistry.set(tracker4)
       TrackerRegistry.get(tracker4.id) must be_==(Some(tracker4)).eventually
+    }
+    
+    def updatesKey = {
+      awaitInit
+      TrackerRegistry.set(tracker6)
+      TrackerRegistry.get(tracker3.id) must be_==(Some(tracker6)).eventually
     }
 
     def syncsWithNetwork = {
