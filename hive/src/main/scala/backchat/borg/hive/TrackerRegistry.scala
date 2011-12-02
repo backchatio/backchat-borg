@@ -46,19 +46,29 @@ object TrackerRegistry {
 
   def set(node: TrackerNode) = registry.actorFor[TrackerRegistryActor] foreach { _ ! Messages.SetTracker(node) }
 
-  class TrackerRegistryActor(config: ZooKeeperClientConfig) extends Actor with Logging with Listeners {
+  class TrackerRegistryActor(config: ZooKeeperClientConfig, testProbe: Option[ActorRef] = None) extends Actor with Logging with Listeners {
 
     import Messages._
 
     val data = new mutable.HashMap[String, TrackerNode]()
     val zk = new ZooKeeperClient(config)
+    logger debug "initializing"
     zk.connect()
-    zk.watchChildrenWithData[TrackerNode](config.rootNode, data, readBytes _, (s: String) ⇒ logger.debug(s))
+    logger debug "connected"
+
+    override protected def gossip(msg: Any) {
+      testProbe foreach { _ ! msg }
+      super.gossip(msg)
+    }
 
     private def readBytes(bytes: Array[Byte]) = {
       val n = TrackerNode(bytes)
       gossip(n)
       n
+    }
+
+    override def preStart() {
+      self ! 'init
     }
 
     protected def receive = listenerManagement orElse nodeManagement
@@ -76,7 +86,12 @@ object TrackerRegistry {
         else
           zk.create(node(nod), nod.toBytes, CreateMode.EPHEMERAL)
       }
-      case 'init ⇒
+      case 'init ⇒ {
+        zk.watchChildrenWithData[TrackerNode](config.rootNode, data, readBytes _, (s: String) ⇒ logger.debug(s))
+        logger debug "set the watcher"
+        testProbe foreach { _ ! 'initialized }
+        logger debug "initialized"
+      }
     }
 
     private def node(nod: TrackerNode) =

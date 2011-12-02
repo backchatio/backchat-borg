@@ -11,10 +11,11 @@ import hive.TrackerRegistry.TrackerNode
 import org.apache.zookeeper.CreateMode
 import util.Random
 import akka.routing.{WithListeners, Listen}
+import java.util.concurrent.{CountDownLatch, TimeUnit}
 
 class TrackerRegistrySpec extends ZooKeeperActorSpecification {
 
-  def is =
+  def is = sequential ^
     "A tracker registry should" ^
       "fill the registry at startup" ! specify.getTheInitialStateForSubtree ^
       "get a key from the registry" ! specify.getsNodeForKey ^
@@ -30,6 +31,8 @@ class TrackerRegistrySpec extends ZooKeeperActorSpecification {
     val tracker1 = TrackerNode("tracker-1", "twitter", Seq("timeline"), 1)
     val tracker2 = TrackerNode("tracker-2", "email", Seq("smtp"), 2)
     val tracker3 = TrackerNode("tracker-3", "xmpp", Seq("gtalk"), 3)
+    val tracker4 = TrackerNode("tracker-4", "twitter", Seq("oauth"), 4)
+    val tracker5 = TrackerNode("tracker-5", "twitter", Seq("oauth"), 5)
 
     doAfter {
       zkClient.deleteRecursive(rootNode)
@@ -60,37 +63,38 @@ class TrackerRegistrySpec extends ZooKeeperActorSpecification {
     }
 
     def notifiesListeners = {
-      awaitInit._2 must haveTheSameElementsAs(Vector(tracker1, tracker2, tracker3))
+      awaitInit
     }
 
+    var lastNode: TrackerNode = null
     private def awaitInit = {
-      val probe = TestProbe()
-      probe.send(probe.ref, 'hello)
-      probe.expectMsg(2.seconds, 'hello)
-      val a = actorOf(new TrackerRegistry.TrackerRegistryActor(config)).start()
-      a ! Listen(probe.ref)
-      sleep -> 50.millis
-      a ! WithListeners(_ ! 'ok)
-      receiveWhile(2.seconds) {
-        case 'ok => true
-        case m => println(m)
+      lastNode = null
+      val started = new CountDownLatch(1)
+      val startingLatch = new CountDownLatch(3)
+      val l = actorOf(new Actor {
+        protected def receive = {
+          case 'initialized => started.countDown()
+          case m: TrackerNode if startingLatch.getCount > 0 => startingLatch.countDown()
+          case m: TrackerNode => lastNode = m
+        }
+      }).start()
+      actorOf(new TrackerRegistry.TrackerRegistryActor(config, Some(l))).start()
+      started.await(2, TimeUnit.SECONDS) must beTrue and {
+        setupNodes()
+        startingLatch.await(2, TimeUnit.SECONDS) must beTrue
       }
-      setupNodes()
-      (probe, probe.receiveN(3))
     }
 
     def setsKey = {
       awaitInit
-      val newnode = TrackerNode("tracker-4", "twitter", Seq("oauth"), 4)
-      TrackerRegistry.set(newnode)
-      TrackerRegistry.get(newnode.id) must_== Some(newnode)
+      TrackerRegistry.set(tracker4)
+      TrackerRegistry.get(tracker4.id) must be_==(Some(tracker4)).eventually
     }
 
     def syncsWithNetwork = {
-      val (probe, _) = awaitInit
-      val newnode = TrackerNode("tracker-4", "twitter", Seq("oauth"), 4)
-      zkClient.create(node(newnode.id), newnode.toBytes, CreateMode.EPHEMERAL)
-      probe.expectMsg(newnode) must_== newnode
+      awaitInit
+      zkClient.create(node(tracker5.id), tracker5.toBytes, CreateMode.EPHEMERAL)
+      lastNode must be_==(tracker5).eventually
     }
   }
 }
