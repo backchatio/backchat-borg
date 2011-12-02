@@ -86,7 +86,7 @@ private[zeromq] class ConcurrentSocketActor(params: SocketParameters, dispatcher
         var frames = Vector(Frame(someBytes))
         while (socket.hasReceiveMore) receiveBytes() match {
           case `noBytes` ⇒
-          case someBytes ⇒ frames :+= Frame(someBytes)
+          case bytes     ⇒ frames :+= Frame(bytes)
         }
         frames
     }
@@ -108,7 +108,7 @@ private[zeromq] class ConcurrentSocketActor(params: SocketParameters, dispatcher
       case HWM(value)         ⇒ sock setHWM value
       case Affinity(value)    ⇒ sock setAffinity value
       case Rate(value)        ⇒ sock setRate value
-      case RecoveryIVL(value) ⇒ sock setReconnectIVL value
+      case RecoveryIVL(value) ⇒ sock setRecoveryInterval value
       case SndBuf(value)      ⇒ sock setSendBufferSize value
       case RcvBuf(value)      ⇒ sock setReceiveBufferSize value
       case Identity(value)    ⇒ sock setIdentity value.getBytes(Utf8)

@@ -26,11 +26,16 @@ javaSource in PB.protobufConfig <<= (sourceManaged in Compile)
 
 libraryDependencies ++= Seq(
   "com.google.protobuf" % "protobuf-java" % "2.4.1",
+  "org.zeromq" %% "zeromq-scala-binding" % "0.0.3",
   mojollyLibrary("core"),
   mojollyLibrary("io"),
   mojollyLibrary("metrics"),
   commons("codec", "1.5"),
   akka("slf4j"),
   "org.apache.hadoop.zookeeper" % "zookeeper" % "3.4.0",
-  specs2, scalaTest, akkaTestkit, mockito, mojollyLibrary("testing") % "test"
+  specs2,
+  scalaTest,
+  akkaTestkit,
+  mockito,
+  mojollyLibrary("testing") % "test"
 )
