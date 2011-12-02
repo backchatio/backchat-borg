@@ -6,7 +6,7 @@ package tests
 import akka.testkit._
 import akka.actor._
 import Actor.actorOf
-import hive.TrackerRegistry.TrackerNode
+import hive.TrackerRegistry._
 import org.apache.zookeeper.CreateMode
 import util.Random
 import java.util.concurrent.{CountDownLatch, TimeUnit}
@@ -72,15 +72,16 @@ class TrackerRegistrySpec extends ZooKeeperActorSpecification {
       val l = actorOf(new Actor {
         protected def receive = {
           case 'initialized => started.countDown()
-          case m: TrackerNode if startingLatch.getCount > 0 => startingLatch.countDown()
-          case m: TrackerNode => lastNode = m
+          case m: Messages.TrackerAdded if startingLatch.getCount > 0 => startingLatch.countDown()
+          case m: Messages.TrackerAdded => lastNode = m.node
+          case _: Messages.TrackerUpdated | _: Messages.TrackerRemoved =>
         }
       }).start()
       actorOf(new TrackerRegistry.TrackerRegistryActor(config, Some(l))).start()
-      started.await(2, TimeUnit.SECONDS) must beTrue and {
+      (started.await(2, TimeUnit.SECONDS) must beTrue) and ({
         setupNodes()
         startingLatch.await(2, TimeUnit.SECONDS) must beTrue
-      }
+      })
     }
 
     def setsKey = {
