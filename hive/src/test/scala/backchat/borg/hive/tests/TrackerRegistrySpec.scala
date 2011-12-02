@@ -13,7 +13,7 @@ import java.util.concurrent.{CountDownLatch, TimeUnit}
 
 class TrackerRegistrySpec extends ZooKeeperActorSpecification {
 
-  def is = //sequential ^
+  def is =
     "A tracker registry should" ^
       "fill the registry at startup" ! specify.getTheInitialStateForSubtree ^
       "get a key from the registry" ! specify.getsNodeForKey ^

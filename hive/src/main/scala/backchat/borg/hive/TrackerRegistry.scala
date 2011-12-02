@@ -52,9 +52,7 @@ object TrackerRegistry {
 
     val data = new mutable.HashMap[String, TrackerNode]()
     val zk = new ZooKeeperClient(config)
-    logger debug "initializing"
     zk.connect()
-    logger debug "connected"
 
     override protected def gossip(msg: Any) {
       testProbe foreach { _ ! msg }
@@ -75,9 +73,7 @@ object TrackerRegistry {
 
     protected def nodeManagement: Receive = {
       case GetTracker(trackerId) ⇒ {
-        logger debug "Fetching: %s, The keys: %s".format(trackerId, data.keys.mkString(", "))
         val fetched = data.get(trackerId)
-        logger debug "Fetched: %s".format(fetched)
         self tryReply fetched
       }
       case SetTracker(nod) ⇒ {
@@ -88,9 +84,8 @@ object TrackerRegistry {
       }
       case 'init ⇒ {
         zk.watchChildrenWithData[TrackerNode](config.rootNode, data, readBytes _, (s: String) ⇒ logger.debug(s))
-        logger debug "set the watcher"
         testProbe foreach { _ ! 'initialized }
-        logger debug "initialized"
+        logger info "Tracker registry has started"
       }
     }
 
