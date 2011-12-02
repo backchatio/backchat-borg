@@ -26,7 +26,6 @@ javaSource in PB.protobufConfig <<= (sourceManaged in Compile)
 
 libraryDependencies ++= Seq(
   "com.google.protobuf" % "protobuf-java" % "2.4.1",
-  "org.zeromq" %% "zeromq-scala-binding" % "0.0.3",
   mojollyLibrary("core"),
   mojollyLibrary("io"),
   mojollyLibrary("metrics"),

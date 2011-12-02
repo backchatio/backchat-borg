@@ -6,14 +6,14 @@ import org.apache.zookeeper.CreateMode._
 import org.apache.zookeeper.KeeperException.NoNodeException
 import org.apache.zookeeper.data.Id
 import scala.collection.mutable
-import backchat.borg.hive.{ZooKeeperClientContext, ZooKeeperSpecification}
+import backchat.borg.{ZooKeeperClientContext, ZooKeeperSpecification}
 import mojolly.testing.TimeHelpers
-import backchat.borg.hive.testing.ZooKeeperTestServer
+import backchat.borg.testing.ZooKeeperTestServer
 
 
 class  ZooKeeperClientSpec extends ZooKeeperSpecification {
   
-  def is = 
+  def is = sequential ^
     "A ZooKeeperClient should" ^
       "be able to be instantiated with a FakeWatcher" ! specify.instantiatesWithFake ^
       "connect to a local ZooKeeper server and retrieve the version" ! specify.retrievesVersion ^
