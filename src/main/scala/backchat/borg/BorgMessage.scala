@@ -8,6 +8,7 @@ import net.liftweb.json._
 import mojolly.Enum
 import borg.Protos.BorgPayload
 import com.google.protobuf.{ Message, ByteString }
+import JsonDSL._
 
 trait MessageSerialization {
 
@@ -36,6 +37,13 @@ case class BorgMessage(messageType: BorgMessage.MessageType.EnumVal, target: Str
 
   type ProtoBufMessage = Protos.BorgMessage
 
+  override def toJValue: JValue =
+    ("messageType" -> messageType.name) ~
+      ("target" -> target) ~
+      ("payload" -> payload.toJson) ~
+      ("sender" -> sender.orNull) ~
+      ("ccid" -> ccid.toString)
+
   def toProtobuf: Protos.BorgMessage = {
     val builder = Protos.BorgMessage.newBuilder()
     builder.setMessageType(messageType.pbType).setTarget(target).setPayload(pbPayload).setCcid(ccid.toString)
@@ -55,8 +63,8 @@ case class BorgMessage(messageType: BorgMessage.MessageType.EnumVal, target: Str
 
 object BorgMessage {
 
-  object MessageType extends Enum {
-    sealed trait EnumVal extends Value {
+  object MessageType extends mojolly.Enum {
+    sealed trait EnumVal extends this.Value {
       def pbType: Protos.BorgMessage.MessageType
     }
 

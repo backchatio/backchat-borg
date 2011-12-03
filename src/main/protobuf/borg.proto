@@ -30,7 +30,7 @@ message BorgMessage {
 
 message Node {
 
-  required int64 id = 1;
+  required uint64 id = 1;
   required string url = 2;
   repeated string capabilities = 3;
   repeated Service services = 4;
@@ -40,7 +40,7 @@ message TrackerNode {
   required string id = 1;
   required string source = 2;
   repeated string kind = 3;
-  required int64 node_id = 4;
+  required uint64 node_id = 4;
   repeated string services = 5;
   required ServiceType provides = 6 [ default = TRACKER ];
 }

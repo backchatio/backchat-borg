@@ -3,6 +3,7 @@ package backchat.borg
 import collection.JavaConversions._
 
 object Node {
+
   def apply(bytes: Array[Byte]): Node = {
     Node(Protos.Node parseFrom bytes)
   }
@@ -20,6 +21,10 @@ case class Node(id: Long, url: String, capabilities: Seq[String], services: Seq[
   type ProtoBufMessage = Protos.Node
 
   def toProtobuf = {
-    Protos.Node.newBuilder.setId(id).setUrl(url).addAllCapabilities(capabilities).addAllServices(services map (_.toProtobuf)).build()
+    (Protos.Node.newBuilder
+      setId id
+      setUrl url
+      addAllCapabilities capabilities
+      addAllServices (services map (_.toProtobuf))).build()
   }
 }

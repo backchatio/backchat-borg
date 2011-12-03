@@ -39,25 +39,30 @@ object TrackerRegistry {
 
     def apply(proto: Protos.TrackerNode): TrackerNode = {
       TrackerNode(
-        proto.getId, 
-        proto.getSource, 
-        Option(proto.getKindList) map (Vector(_:_*)) getOrElse Vector.empty,
+        proto.getId,
+        proto.getSource,
+        Option(proto.getKindList) map (Vector(_: _*)) getOrElse Vector.empty,
         proto.getNodeId,
-        Option(proto.getServicesList) map (Vector(_:_*)) getOrElse Vector.empty,
+        Option(proto.getServicesList) map (Vector(_: _*)) getOrElse Vector.empty,
         ServiceType(proto.getProvides))
     }
   }
 
-  case class TrackerNode(id: String, source: String, kinds: Seq[String], nodeId: Long, services: Seq[String], provides: ServiceType.EnumVal) extends MessageSerialization {
+  case class TrackerNode(
+      id: String,
+      source: String,
+      kinds: Seq[String],
+      nodeId: Long,
+      services: Seq[String] = Vector.empty,
+      provides: ServiceType.EnumVal = ServiceType.Tracker) extends MessageSerialization {
     type ProtoBufMessage = Protos.TrackerNode
 
-
-    override def toJValue : JValue = {
+    override def toJValue: JValue = {
       ("id" -> id) ~
-      ("source" -> source) ~
-      ("kinds" -> kinds) ~
-      ("nodeId" -> nodeId) ~
-      ("provides" -> provides.name)
+        ("source" -> source) ~
+        ("kinds" -> kinds) ~
+        ("nodeId" -> nodeId) ~
+        ("provides" -> provides.name)
     }
 
     def toProtobuf = {
