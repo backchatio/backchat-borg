@@ -4,21 +4,14 @@ package telepathy
 package tests
 
 import org.zeromq.ZMQ
-import mojolly.io.FreePort
-import org.zeromq.ZMQ.{Context, Poller, Socket}
-import collection.mutable.ListBuffer
 import net.liftweb.json.JsonAST.{JArray, JString}
 import org.multiverse.api.latches.StandardLatch
 import java.util.concurrent.TimeUnit
-import akka.zeromq.{ZMQMessage, Frame}
-import org.specs2.execute.Result
+import akka.zeromq.Frame
 import BorgMessage.MessageType
 import telepathy.Messages._
 import akka.actor._
-import mojolly.testing.{MojollySpecification}
-import org.specs2.specification.{Around, After, Step, Fragments}
-import util.DynamicVariable
-
+import mojolly.testing.MojollySpecification
 
 
 class ClientSpec extends MojollySpecification { def is =

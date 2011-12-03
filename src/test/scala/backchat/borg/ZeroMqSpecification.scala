@@ -113,13 +113,6 @@ class ZeroMQPoller(context: Context) {
   def isEmpty = size > 0
 }
 
-trait ZeroMqSpecification extends MojollySpecification {
-
-  val zmqContext = ZMQ.context(1)
-  val poller = new ZeroMQPoller(zmqContext)
-
-  //  override def map(fs: => Fragments) = super.map(fs) ^ Step(poller.dispose()) ^ Step(zmqContext.term())
-}
 trait ZeroMqContext extends Around {
 
   val deser = new BorgZMQMessageSerializer

@@ -9,6 +9,10 @@ import telepathy.Messages.{ Reply, Ask, Tell }
 
 case class TelepathClientConfig(server: TelepathAddress, listener: Option[ActorRef] = None)
 
+object Client {
+
+}
+
 class Client(config: TelepathClientConfig) extends Telepath {
 
   lazy val socket = newSocket(SocketType.Dealer, Linger(0L))

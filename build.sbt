@@ -7,7 +7,9 @@ seq(buildSettings:_*)
 
 seq(PB.protobufSettings:_*)
 
-version := "0.0.5-SNAPSHOT"
+name := "backchat-borg"
+
+version := "0.1.5-SNAPSHOT"
 
 organization := "com.mojolly.borg"
 

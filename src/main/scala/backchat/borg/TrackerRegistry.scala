@@ -9,6 +9,8 @@ import com.twitter.zookeeper.{ ZooKeeperClient, ZooKeeperClientConfig }
 import org.apache.zookeeper.CreateMode
 import akka.stm._
 import akka.routing.{ Deafen, Listen, Listeners }
+import net.liftweb.json._
+import JsonDSL._
 
 trait TrackerRegistryListener {
 
@@ -36,15 +38,36 @@ object TrackerRegistry {
     }
 
     def apply(proto: Protos.TrackerNode): TrackerNode = {
-      TrackerNode(proto.getId, proto.getSource, Option(proto.getKindList) map (_.toList) getOrElse Nil, proto.getNodeId)
+      TrackerNode(
+        proto.getId, 
+        proto.getSource, 
+        Option(proto.getKindList) map (Vector(_:_*)) getOrElse Vector.empty,
+        proto.getNodeId,
+        Option(proto.getServicesList) map (Vector(_:_*)) getOrElse Vector.empty,
+        ServiceType(proto.getProvides))
     }
   }
 
-  case class TrackerNode(id: String, source: String, kinds: Seq[String], nodeId: Long) extends MessageSerialization {
+  case class TrackerNode(id: String, source: String, kinds: Seq[String], nodeId: Long, services: Seq[String], provides: ServiceType.EnumVal) extends MessageSerialization {
     type ProtoBufMessage = Protos.TrackerNode
 
+
+    override def toJValue : JValue = {
+      ("id" -> id) ~
+      ("source" -> source) ~
+      ("kinds" -> kinds) ~
+      ("nodeId" -> nodeId) ~
+      ("provides" -> provides.name)
+    }
+
     def toProtobuf = {
-      Protos.TrackerNode.newBuilder.setId(id).setSource(source).addAllKind(kinds).setNodeId(nodeId).build()
+      (Protos.TrackerNode.newBuilder
+        setId id
+        setSource source
+        addAllKind kinds
+        setNodeId nodeId
+        addAllServices services
+        setProvides provides.pbType).build()
     }
   }
   object Messages {

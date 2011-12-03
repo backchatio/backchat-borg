@@ -28,20 +28,29 @@ message BorgMessage {
 
 }
 
-message HiveNode {
+message Node {
 
   required int64 id = 1;
   required string url = 2;
-  required bool reliable = 3;
+  repeated string capabilities = 3;
+  repeated Service services = 4;
 }
 
 message TrackerNode {
-
-
   required string id = 1;
   required string source = 2;
   repeated string kind = 3;
   required int64 node_id = 4;
+  repeated string services = 5;
+  required ServiceType provides = 6 [ default = TRACKER ];
+}
+
+enum ServiceType {
+  DOMAIN = 0;
+  STREAMS = 1;
+  INDEXER = 2;
+  TRACKER = 3;
+  PUBLISHER = 4;
 }
 
 message Service {
@@ -53,13 +62,13 @@ message Service {
     GEM = 4;
     EGG = 5;
     NPM = 6;
+    DEB = 7;
   }
 
   required string name = 1;
-  required int64 node_id = 2;
   optional bytes data = 3;
   required DeploymentType deploy_as = 4 [ default = JAR ];
-
+  required ServiceType provides = 5 [ default = DOMAIN];
 }
 
 

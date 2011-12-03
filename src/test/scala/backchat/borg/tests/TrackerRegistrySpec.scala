@@ -11,7 +11,7 @@ import java.util.concurrent.{CountDownLatch, TimeUnit}
 
 class TrackerRegistrySpec extends ZooKeeperActorSpecification {
 
-  def is =
+  def is = sequential ^ // although the rootnode is randomized it still gets confused
     "A tracker registry should" ^
       "fill the registry at startup" ! specify.getTheInitialStateForSubtree ^
       "get a key from the registry" ! specify.getsNodeForKey ^
@@ -21,7 +21,7 @@ class TrackerRegistrySpec extends ZooKeeperActorSpecification {
       "keep the registry in sync with network changes" ! specify.syncsWithNetwork ^
     end
 
-  def specify = new TrackerRegistryContext("/trackers-" + Random.nextInt(300))
+  def specify = new TrackerRegistryContext("/trackers-" + Random.nextInt(300).toString)
 
   class TrackerRegistryContext(rootNode: String) extends ZooKeeperClientContext(zookeeperServer, rootNode) with TestKit {
 
