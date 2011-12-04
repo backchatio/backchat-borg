@@ -13,11 +13,11 @@ object Node {
       proto.getId,
       proto.getUrl,
       Option(proto.getCapabilitiesList) map (Vector(_: _*)) getOrElse Vector.empty,
-      Option(proto.getServicesList) map (Vector(_: _*)) getOrElse Vector.empty map Service.apply)
+      Option(proto.getServicesList) map (Vector(_: _*)) getOrElse Vector.empty)
   }
 }
 
-case class Node(id: Long, url: String, capabilities: Seq[String], services: Seq[Service]) extends MessageSerialization {
+case class Node(id: Long, url: String, capabilities: Seq[String], services: Seq[String]) extends MessageSerialization {
   type ProtoBufMessage = Protos.Node
 
   def toProtobuf = {
@@ -25,6 +25,6 @@ case class Node(id: Long, url: String, capabilities: Seq[String], services: Seq[
       setId id
       setUrl url
       addAllCapabilities capabilities
-      addAllServices (services map (_.toProtobuf))).build()
+      addAllServices services).build()
   }
 }

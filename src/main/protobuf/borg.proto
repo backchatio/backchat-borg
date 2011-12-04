@@ -33,7 +33,7 @@ message Node {
   required uint64 id = 1;
   required string url = 2;
   repeated string capabilities = 3;
-  repeated Service services = 4;
+  repeated string services = 4;
 }
 
 message TrackerNode {
