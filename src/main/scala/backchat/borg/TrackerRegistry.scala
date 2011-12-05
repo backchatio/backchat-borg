@@ -7,10 +7,11 @@ import Scalaz._
 import collection.JavaConversions._
 import com.twitter.zookeeper.{ ZooKeeperClient, ZooKeeperClientConfig }
 import org.apache.zookeeper.CreateMode
-import akka.stm._
 import akka.routing.{ Deafen, Listen, Listeners }
 import net.liftweb.json._
 import JsonDSL._
+import java.util.concurrent.ConcurrentHashMap
+import collection.mutable.ConcurrentMap
 
 trait TrackerRegistryListener {
 
@@ -128,7 +129,7 @@ object TrackerRegistry {
 
     import Messages._
 
-    var data = TransactionalMap[String, TrackerNode]()
+    var data: ConcurrentMap[String, TrackerNode] = new ConcurrentHashMap[String, TrackerNode]()
     val zk = new ZooKeeperClient(config)
     zk.connect()
 
@@ -145,7 +146,7 @@ object TrackerRegistry {
 
     protected def nodeManagement: Receive = {
       case GetTracker(trackerId) ⇒ {
-        val fetched = atomic { data.get(trackerId) }
+        val fetched = data.get(trackerId)
         self tryReply fetched
       }
       case SetTracker(nod) ⇒ {
@@ -163,13 +164,13 @@ object TrackerRegistry {
 
     private def childrenChanged(children: Seq[String]) {
       val childrenSet = Set(children: _*)
-      val watchedKeys = atomic { Set(data.keySet.toSeq: _*) }
+      val watchedKeys = Set(data.keySet.toSeq: _*)
       val removedChildren = watchedKeys -- childrenSet
       val addedChildren = childrenSet -- watchedKeys
 
-      val removedNodes = atomic {
+      val removedNodes = {
         val ch = data filterKeys removedChildren.contains
-        data -- removedChildren
+        data --= removedChildren
         ch.values.toSet
       }
 
@@ -181,14 +182,14 @@ object TrackerRegistry {
       newData match {
         case Some(d) ⇒ {
           val nod = TrackerNode(d)
-          var isUpdate = true
 
-          atomic {
-            isUpdate = data.containsKey(child)
+          val previous = {
+            val prev = data get child
             data(child) = nod
+            prev
           }
 
-          if (isUpdate) gossip(TrackerUpdated(nod))
+          if (previous.isDefined) gossip(TrackerUpdated(nod))
           else gossip(TrackerAdded(nod))
         }
         case None ⇒ // deletion handled via parent watch

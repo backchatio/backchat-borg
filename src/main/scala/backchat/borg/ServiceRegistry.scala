@@ -1,16 +1,16 @@
 package backchat.borg
 
-import akka.stm._
 import akka.dispatch.Dispatchers
 import akka.actor._
 import Actor._
-import akka.config.Supervision.SupervisorConfig
 import com.twitter.zookeeper.{ ZooKeeperClientConfig, ZooKeeperClient }
 import collection.JavaConversions._
 import akka.routing.Listeners
 import org.apache.zookeeper.CreateMode
 import akka.config.Supervision
 import akka.config.Supervision._
+import java.util.concurrent.ConcurrentHashMap
+import collection.mutable.ConcurrentMap
 
 trait ServiceRegistryListener {
 
@@ -29,8 +29,8 @@ case class ServiceRegistryContext(
 
 object ServiceRegistry {
 
-  private val availableServers = TransactionalMap[String, Node]()
-  private val activeServices = TransactionalMap[String, Service]
+  private val availableServers: ConcurrentMap[String, Node] = new ConcurrentHashMap[String, Node]()
+  private val availableServices: ConcurrentMap[String, Service] = new ConcurrentHashMap[String, Service]
 
   private val serviceRegistryDispatcher =
     Dispatchers.newExecutorBasedEventDrivenWorkStealingDispatcher("service-registry-dispatch", 10).build
@@ -89,13 +89,13 @@ object ServiceRegistry {
 
     private def childrenChanged(children: Seq[String]) {
       val childrenSet = Set(children: _*)
-      val watchedKeys = atomic { Set(availableServers.keySet.toSeq: _*) }
+      val watchedKeys = Set(availableServers.keySet.toSeq: _*)
       val removedChildren = watchedKeys -- childrenSet
       val addedChildren = childrenSet -- watchedKeys
 
-      val removedNodes = atomic {
+      val removedNodes = {
         val ch = availableServers filterKeys removedChildren.contains
-        availableServers -- removedChildren
+        availableServers --= removedChildren
         ch.values.toSet
       }
       addedChildren foreach { child ⇒ zk.watchNode(childNode(child), nodeChanged(child)) }
@@ -107,7 +107,7 @@ object ServiceRegistry {
         case Some(d) ⇒ {
           val nod = Node(d)
 
-          val previous = atomic {
+          val previous = {
             val prev = availableServers get child
             availableServers(child) = nod
             prev
@@ -131,7 +131,7 @@ object ServiceRegistry {
 
   }
 
-  private class ActiveServices(zk: ZooKeeperClient, context: ServiceRegistryContext) extends Actor with Listeners with Logging {
+  private class AvailableServices(zk: ZooKeeperClient, context: ServiceRegistryContext) extends Actor with Listeners with Logging {
     import Messages._
 
     zk.watchChildren(context.servicesNode, childrenChanged)
@@ -152,13 +152,13 @@ object ServiceRegistry {
 
     private def childrenChanged(children: Seq[String]) {
       val childrenSet = Set(children: _*)
-      val watchedKeys = atomic { Set(activeServices.keySet.toSeq: _*) }
+      val watchedKeys = Set(availableServices.keySet.toSeq: _*)
       val removedChildren = watchedKeys -- childrenSet
       val addedChildren = childrenSet -- watchedKeys
 
-      val removedNodes = atomic {
-        val ch = activeServices filterKeys removedChildren.contains
-        activeServices -- removedChildren
+      val removedNodes = {
+        val ch = availableServices filterKeys removedChildren.contains
+        availableServices -- removedChildren
         ch.values.toSet
       }
       addedChildren foreach { child ⇒ zk.watchNode(childNode(child), nodeChanged(child)) }
@@ -170,9 +170,9 @@ object ServiceRegistry {
         case Some(d) ⇒ {
           val nod = Service(d)
 
-          val previous = atomic {
-            val prev = activeServices get child
-            activeServices(child) = nod
+          val previous = {
+            val prev = availableServices.get(child)
+            availableServices(child) = nod
             prev
           }
 
@@ -206,7 +206,7 @@ object ServiceRegistry {
     zk.connect()
 
     val members = actorOf(new AvailableNodes(zk, context))
-    val services = actorOf(new ActiveServices(zk, context))
+    val services = actorOf(new AvailableServices(zk, context))
 
     protected def receive = listenerManagement orElse manageNodes
 
