@@ -75,9 +75,8 @@ import Service.DeploymentType
 case class Service(
     name: String,
     deployedAs: DeploymentType.EnumVal = DeploymentType.Jar,
-    provides: ServiceType.EnumVal = ServiceType.Domain) extends Subject {
+    provides: ServiceType.EnumVal = ServiceType.Domain) extends Subject[String] {
 
-  type IdType = String
   def id = name
   type ProtoBufMessage = Protos.Service
 

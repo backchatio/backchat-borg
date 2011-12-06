@@ -7,11 +7,10 @@ import org.apache.zookeeper.CreateMode
 import collection.mutable.ConcurrentMap
 import akka.actor.{ ActorRef, Actor }
 
-trait Subject extends MessageSerialization {
-  type IdType
+trait Subject[IdType] extends MessageSerialization {
   def id: IdType
 }
-trait ZooKeeperRegistryMessageProvider[EventType, SubjectType <: Subject] {
+trait ZooKeeperRegistryMessageProvider[EventType, IdType, SubjectType <: Subject[IdType]] {
 
   def node(bytes: Array[Byte]): SubjectType
   def addNode(subject: SubjectType): EventType
@@ -22,11 +21,11 @@ trait ZooKeeperRegistryMessageProvider[EventType, SubjectType <: Subject] {
   def nodeRemoved(subject: SubjectType): EventType
 }
 
-trait ZooKeeperRegistryConfig[EventType, SubjectType <: Subject] extends ZooKeeperRegistryMessageProvider[EventType, SubjectType] {
+trait ZooKeeperRegistryConfig[EventType, IdType, SubjectType <: Subject[IdType]] extends ZooKeeperRegistryMessageProvider[EventType, IdType, SubjectType] {
   def zookeeper: ZooKeeperClient
   def rootNode: String
-  def data: ConcurrentMap[String, SubjectType]
-  def messageProvider: ZooKeeperRegistryMessageProvider[EventType, SubjectType]
+  def data: ConcurrentMap[IdType, SubjectType]
+  def messageProvider: ZooKeeperRegistryMessageProvider[EventType, IdType, SubjectType]
   def testProbe: Option[ActorRef] = None
 
   def node(bytes: Array[Byte]) = messageProvider.node(bytes)
@@ -41,7 +40,7 @@ trait ZooKeeperRegistryConfig[EventType, SubjectType <: Subject] extends ZooKeep
 
   def nodeRemoved(subject: SubjectType) = messageProvider.nodeRemoved(subject)
 }
-abstract class ZooKeeperRegistry[EventType, SubjectType <: Subject: Manifest](context: ZooKeeperRegistryConfig[EventType, SubjectType]) extends Actor with Listeners with Logging {
+abstract class ZooKeeperRegistry[EventType, IdType: Manifest, SubjectType <: Subject[IdType]: Manifest](context: ZooKeeperRegistryConfig[EventType, IdType, SubjectType]) extends Actor with Listeners with Logging {
 
   val data = context.data
 
@@ -49,7 +48,8 @@ abstract class ZooKeeperRegistry[EventType, SubjectType <: Subject: Manifest](co
 
   override def preStart() {
     super.preStart()
-    self ! 'init
+    zk.watchChildren(context.rootNode, childrenChanged)
+    context.testProbe foreach { _ ! 'initialized }
   }
 
   protected def receive = listenerManagement orElse manageNodes
@@ -66,16 +66,20 @@ abstract class ZooKeeperRegistry[EventType, SubjectType <: Subject: Manifest](co
       val subj = node.asInstanceOf[SubjectType]
       zk delete nodePath(subj)
     }
-    case 'init ⇒ {
-      zk.watchChildren(context.rootNode, childrenChanged)
-      context.testProbe foreach { _ ! 'initialized }
-    }
   }
 
-  private def isSubject[TMessage: Manifest](node: TMessage) = manifest[TMessage] >:> manifest[SubjectType]
+  protected def isSubject[TMessage: Manifest](node: TMessage) = manifest[TMessage] >:> manifest[SubjectType]
 
-  private def childrenChanged(children: Seq[String]) {
-    val childrenSet = Set(children: _*)
+  def str2IdType(value: String): IdType = {
+    val mf = manifest[IdType]
+    if (mf <:< manifest[Long])
+      value.toLong.asInstanceOf[IdType]
+    else
+      value.asInstanceOf[IdType]
+  }
+
+  protected def childrenChanged(children: Seq[String]) {
+    val childrenSet = Set(children map str2IdType: _*)
     val watchedKeys = Set(data.keySet.toSeq: _*)
     val removedChildren = watchedKeys -- childrenSet
     val addedChildren = childrenSet -- watchedKeys
@@ -85,11 +89,11 @@ abstract class ZooKeeperRegistry[EventType, SubjectType <: Subject: Manifest](co
       data --= removedChildren
       ch.values.toSet
     }
-    addedChildren foreach { child ⇒ zk.watchNode(childNode(child), nodeChanged(child)) }
+    addedChildren foreach { child ⇒ zk.watchNode(childNode(child.toString), nodeChanged(child)) }
     removedNodes foreach { t ⇒ gossip(context.nodeRemoved(t)) }
   }
 
-  private def nodeChanged(child: String)(newData: Option[Array[Byte]]) {
+  protected def nodeChanged(child: IdType)(newData: Option[Array[Byte]]) {
     newData match {
       case Some(d) ⇒ {
         val nod = context.messageProvider.node(d)

@@ -54,9 +54,8 @@ object TrackerRegistry {
       kinds: Seq[String],
       nodeId: Long,
       services: Seq[String] = Vector.empty,
-      provides: ServiceType.EnumVal = ServiceType.Tracker) extends Subject {
+      provides: ServiceType.EnumVal = ServiceType.Tracker) extends Subject[String] {
 
-    type IdType = String
     type ProtoBufMessage = Protos.TrackerNode
 
     override def toJValue: JValue = {
@@ -129,7 +128,7 @@ object TrackerRegistry {
 
   def set(node: TrackerNode) = registry.actorFor[TrackerRegistryActor] foreach { _ ! ('add, node) }
 
-  private[borg] class TrackerRegistryMessageProvider extends ZooKeeperRegistryMessageProvider[Messages.TrackerRegistryMessage, TrackerNode] {
+  private[borg] class TrackerRegistryMessageProvider extends ZooKeeperRegistryMessageProvider[Messages.TrackerRegistryMessage, String, TrackerNode] {
     def node(bytes: Array[Byte]) = TrackerNode(bytes)
     def addNode(subject: TrackerNode) = Messages.SetTracker(subject)
     def removeNode(subject: TrackerNode) = Messages.RemoveTracker(subject)
@@ -138,12 +137,12 @@ object TrackerRegistry {
     def nodeRemoved(subject: TrackerNode) = Messages.TrackerRemoved(subject)
   }
 
-  private[borg] case class TrackerRegistryConfig(zookeeper: ZooKeeperClient) extends ZooKeeperRegistryConfig[Messages.TrackerRegistryMessage, TrackerNode] {
+  private[borg] case class TrackerRegistryConfig(zookeeper: ZooKeeperClient) extends ZooKeeperRegistryConfig[Messages.TrackerRegistryMessage, String, TrackerNode] {
     val rootNode = "/trackers"
     val data = trackers
     val messageProvider = new TrackerRegistryMessageProvider
   }
 
-  private[borg] class TrackerRegistryActor(config: TrackerRegistryConfig) extends ZooKeeperRegistry[Messages.TrackerRegistryMessage, TrackerNode](config)
+  private[borg] class TrackerRegistryActor(config: TrackerRegistryConfig) extends ZooKeeperRegistry[Messages.TrackerRegistryMessage, String, TrackerNode](config)
 
 }

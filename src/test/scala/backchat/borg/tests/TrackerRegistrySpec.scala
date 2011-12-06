@@ -57,8 +57,8 @@ class TrackerRegistrySpec extends ZooKeeperActorSpecification {
       val context = new TrackerRegistryConfig(zkTc) {
         override val rootNode = rn
       }
-      val a = TestActorRef(new TrackerRegistry.TrackerRegistryActor(context)).start()
-      a.underlyingActor.data.size must be_==(3).eventually
+      TestActorRef(new TrackerRegistry.TrackerRegistryActor(context)).start()
+      TrackerRegistry.trackers.size must be_==(3).eventually
     }
 
     def getsNodeForKey = {

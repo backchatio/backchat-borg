@@ -17,9 +17,8 @@ object Node {
   }
 }
 
-case class Node(id: Long, url: String, capabilities: Seq[String], services: Seq[String]) extends Subject {
+case class Node(id: Long, url: String, capabilities: Seq[String], services: Seq[String]) extends Subject[Long] {
 
-  type IdType = Long
   type ProtoBufMessage = Protos.Node
 
   def toProtobuf = {
