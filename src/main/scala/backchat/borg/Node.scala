@@ -17,7 +17,9 @@ object Node {
   }
 }
 
-case class Node(id: Long, url: String, capabilities: Seq[String], services: Seq[String]) extends MessageSerialization {
+case class Node(id: Long, url: String, capabilities: Seq[String], services: Seq[String]) extends Subject {
+
+  type IdType = Long
   type ProtoBufMessage = Protos.Node
 
   def toProtobuf = {

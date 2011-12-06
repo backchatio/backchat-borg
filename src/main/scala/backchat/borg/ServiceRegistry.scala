@@ -11,6 +11,7 @@ import akka.config.Supervision
 import akka.config.Supervision._
 import java.util.concurrent.ConcurrentHashMap
 import collection.mutable.ConcurrentMap
+import backchat.borg.ServiceRegistry.Messages.NodeMessage
 
 trait ServiceRegistryListener {
 
@@ -68,131 +69,43 @@ object ServiceRegistry {
     case class UnregisterService(service: Service) extends ServiceMessage
   }
 
-  private class AvailableNodes(zk: ZooKeeperClient, context: ServiceRegistryContext) extends Actor with Listeners with Logging {
-    import Messages._
-
-    zk.watchChildren(context.membersNode, childrenChanged)
-
-    protected def receive = listenerManagement orElse manageNodes
-
-    protected def manageNodes: Receive = {
-      case AddNode(node) ⇒ {
-        if (zk.exists(nodePath(node)))
-          zk.set(nodePath(node), node.toBytes)
-        else
-          zk.create(nodePath(node), node.toBytes, CreateMode.EPHEMERAL)
-      }
-      case RemoveNode(node) ⇒ {
-        zk delete nodePath(node)
-      }
-    }
-
-    private def childrenChanged(children: Seq[String]) {
-      val childrenSet = Set(children: _*)
-      val watchedKeys = Set(availableServers.keySet.toSeq: _*)
-      val removedChildren = watchedKeys -- childrenSet
-      val addedChildren = childrenSet -- watchedKeys
-
-      val removedNodes = {
-        val ch = availableServers filterKeys removedChildren.contains
-        availableServers --= removedChildren
-        ch.values.toSet
-      }
-      addedChildren foreach { child ⇒ zk.watchNode(childNode(child), nodeChanged(child)) }
-      removedNodes foreach { t ⇒ gossip(NodeRemoved(t)) }
-    }
-
-    private def nodeChanged(child: String)(newData: Option[Array[Byte]]) {
-      newData match {
-        case Some(d) ⇒ {
-          val nod = Node(d)
-
-          val previous = {
-            val prev = availableServers get child
-            availableServers(child) = nod
-            prev
-          }
-
-          if (previous.isDefined) gossip(NodeUpdated(nod, previous.get))
-          else gossip(NodeAdded(nod))
-        }
-        case None ⇒ // deletion handled via parent watch
-      }
-    }
-
-    protected def nodePath(child: Node) = childNode(child.id.toString)
-    protected def childNode(child: String) = {
-      (context.membersNode.endsWith("/"), child.startsWith("/")) match {
-        case (true, true)   ⇒ context.membersNode + child.substring(1)
-        case (false, false) ⇒ context.membersNode + "/" + child
-        case _              ⇒ context.membersNode + child
-      }
-    }
-
+  private[this] class AvailableNodesMessageProvider extends ZooKeeperRegistryMessageProvider[Messages.NodeMessage, Node] {
+    def node(bytes: Array[Byte]) = Node(bytes)
+    def addNode(subject: Node) = Messages.AddNode(subject)
+    def removeNode(subject: Node) = Messages.RemoveNode(subject)
+    def nodeAdded(subject: Node) = Messages.NodeAdded(subject)
+    def nodeUpdated(subject: Node, previous: Node) = Messages.NodeUpdated(subject, previous)
+    def nodeRemoved(subject: Node) = Messages.NodeRemoved(subject)
   }
 
-  private class AvailableServices(zk: ZooKeeperClient, context: ServiceRegistryContext) extends Actor with Listeners with Logging {
-    import Messages._
+  private[this] case class AvailableNodesConfig(zookeeper: ZooKeeperClient) extends ZooKeeperRegistryConfig[Messages.NodeMessage, Node] {
+    val rootNode = "/members"
 
-    zk.watchChildren(context.servicesNode, childrenChanged)
+    val data = availableServers
 
-    protected def receive = listenerManagement orElse manageNodes
-
-    protected def manageNodes: Receive = {
-      case RegisterService(node) ⇒ {
-        if (zk.exists(nodePath(node)))
-          zk.set(nodePath(node), node.toBytes)
-        else
-          zk.create(nodePath(node), node.toBytes, CreateMode.EPHEMERAL)
-      }
-      case UnregisterService(node) ⇒ {
-        zk delete nodePath(node)
-      }
-    }
-
-    private def childrenChanged(children: Seq[String]) {
-      val childrenSet = Set(children: _*)
-      val watchedKeys = Set(availableServices.keySet.toSeq: _*)
-      val removedChildren = watchedKeys -- childrenSet
-      val addedChildren = childrenSet -- watchedKeys
-
-      val removedNodes = {
-        val ch = availableServices filterKeys removedChildren.contains
-        availableServices -- removedChildren
-        ch.values.toSet
-      }
-      addedChildren foreach { child ⇒ zk.watchNode(childNode(child), nodeChanged(child)) }
-      removedNodes foreach { t ⇒ gossip(ServiceRemoved(t)) }
-    }
-
-    private def nodeChanged(child: String)(newData: Option[Array[Byte]]) {
-      newData match {
-        case Some(d) ⇒ {
-          val nod = Service(d)
-
-          val previous = {
-            val prev = availableServices.get(child)
-            availableServices(child) = nod
-            prev
-          }
-
-          if (previous.isDefined) gossip(ServiceUpdated(nod, previous.get))
-          else gossip(ServiceAdded(nod))
-        }
-        case None ⇒ // deletion handled via parent watch
-      }
-    }
-
-    protected def nodePath(child: Service) = childNode(child.name)
-    protected def childNode(child: String) = {
-      (context.servicesNode.endsWith("/"), child.startsWith("/")) match {
-        case (true, true)   ⇒ context.servicesNode + child.substring(1)
-        case (false, false) ⇒ context.servicesNode + "/" + child
-        case _              ⇒ context.servicesNode + child
-      }
-    }
-
+    val messageProvider = new AvailableNodesMessageProvider
   }
+
+  private class AvailableNodes(config: AvailableNodesConfig) extends ZooKeeperRegistry[Messages.NodeMessage, Node](config)
+
+  private[this] class AvailableServicesMessageProvider extends ZooKeeperRegistryMessageProvider[Messages.ServiceMessage, Service] {
+    def node(bytes: Array[Byte]) = Service(bytes)
+    def addNode(subject: Service) = Messages.RegisterService(subject)
+    def removeNode(subject: Service) = Messages.UnregisterService(subject)
+    def nodeAdded(subject: Service) = Messages.ServiceAdded(subject)
+    def nodeUpdated(subject: Service, previous: Service) = Messages.ServiceUpdated(subject, previous)
+    def nodeRemoved(subject: Service) = Messages.ServiceRemoved(subject)
+  }
+
+  private[this] case class AvailableServicesConfig(zookeeper: ZooKeeperClient) extends ZooKeeperRegistryConfig[Messages.ServiceMessage, Service] {
+    val rootNode = "/services"
+
+    val data = availableServices
+
+    val messageProvider = new AvailableServicesMessageProvider
+  }
+
+  private class AvailableServices(config: AvailableServicesConfig) extends ZooKeeperRegistry[Messages.ServiceMessage, Service](config)
 
   private[borg] class ServiceRegistryActor(context: ServiceRegistryContext) extends Actor with Listeners with Logging {
 
@@ -205,16 +118,16 @@ object ServiceRegistry {
     val zk = new ZooKeeperClient(context.zookeeperConfig)
     zk.connect()
 
-    val members = actorOf(new AvailableNodes(zk, context))
-    val services = actorOf(new AvailableServices(zk, context))
+    val members = actorOf(new AvailableNodes(AvailableNodesConfig(zk)))
+    val services = actorOf(new AvailableServices(AvailableServicesConfig(zk)))
 
     protected def receive = listenerManagement orElse manageNodes
 
     protected def manageNodes: Receive = {
-      case m: AddNode           ⇒ members ! m
-      case m: RemoveNode        ⇒ members ! m
-      case m: RegisterService   ⇒ services ! m
-      case m: UnregisterService ⇒ services ! m
+      case m: AddNode           ⇒ members ! ('add, m.node)
+      case m: RemoveNode        ⇒ members ! ('remove, m.node)
+      case m: RegisterService   ⇒ services ! ('add, m.service)
+      case m: UnregisterService ⇒ services ! ('remove, m.service)
       case 'init ⇒ {
         context.testProbe foreach { _ ! 'initialized }
         self startLink members

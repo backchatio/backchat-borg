@@ -75,7 +75,10 @@ import Service.DeploymentType
 case class Service(
     name: String,
     deployedAs: DeploymentType.EnumVal = DeploymentType.Jar,
-    provides: ServiceType.EnumVal = ServiceType.Domain) extends MessageSerialization {
+    provides: ServiceType.EnumVal = ServiceType.Domain) extends Subject {
+
+  type IdType = String
+  def id = name
   type ProtoBufMessage = Protos.Service
 
   override def toJValue: JValue = ("name" -> name) ~ ("deployedAs" -> deployedAs.name) ~ ("provides" -> provides.name)
