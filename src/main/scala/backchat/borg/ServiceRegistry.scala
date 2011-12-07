@@ -6,7 +6,7 @@ import com.twitter.zookeeper.{ ZooKeeperClientConfig, ZooKeeperClient }
 import collection.JavaConversions._
 import akka.config.Supervision
 import Supervision._
-import collection.mutable.ConcurrentMap
+import collection.mutable.{ ConcurrentMap, HashSet }
 import akka.routing.{ Listen, Listeners }
 import java.util.concurrent.ConcurrentHashMap
 
@@ -35,10 +35,10 @@ trait ServiceRegistryClient {
   def registerService(service: Service) { proxy ! RegisterService(service) }
   def unregisterService(service: Service) { proxy ! UnregisterService(service) }
 
-  def getNode(id: Long) = (proxy ? GetNode(id)).as[Node]
+  def getNode(id: String) = (proxy ? GetNode(id)).as[Node]
   def getService(name: String) = (proxy ? GetService(name)).as[Service]
 
-  def nodeExists(id: Long) = getNode(id).isDefined
+  def nodeExists(id: String) = getNode(id).isDefined
   def serviceExists(name: String) = getService(name).isDefined
 
   def addListener(listener: ServiceRegistryListener) { proxy ! AddListener(listener) }
@@ -48,9 +48,8 @@ trait ServiceRegistryClient {
 
 case class ServiceRegistryContext(
   zookeeperConfig: ZooKeeperClientConfig,
-  members: ConcurrentMap[Long, Node] = new ConcurrentHashMap[Long, Node](),
+  members: ConcurrentMap[String, Node] = new ConcurrentHashMap[String, Node](),
   services: ConcurrentMap[String, Service] = new ConcurrentHashMap[String, Service](),
-  clientOnly: Boolean = false,
   testProbe: Option[ActorRef] = None)
 
 object ServiceRegistry {
@@ -65,7 +64,9 @@ object ServiceRegistry {
     case class NodeRemoved(node: Node) extends NodeEvent
     case class AddNode(node: Node) extends NodeMessage
     case class RemoveNode(node: Node) extends NodeMessage
-    case class GetNode(id: Long) extends NodeMessage
+    case class GetNode(id: String) extends NodeMessage
+    case class AddressFor(service: String) extends NodeMessage
+    case class NodeForService(service: String) extends NodeMessage
 
     case class AddListener(listener: ServiceRegistryListener) extends ServiceRegistryMessage
     case class RemoveListener(listener: ServiceRegistryListener) extends ServiceRegistryMessage
@@ -78,9 +79,10 @@ object ServiceRegistry {
     case class RegisterService(service: Service) extends ServiceMessage
     case class GetService(name: String) extends ServiceMessage
     case class UnregisterService(service: Service) extends ServiceMessage
+    case object ServiceUnavailable extends ServiceMessage
   }
 
-  private[borg] class AvailableNodesMessageProvider extends ZooKeeperRegistryMessageProvider[Messages.NodeMessage, Long, Node] {
+  private[borg] class AvailableNodesMessageProvider extends ZooKeeperRegistryMessageProvider[Messages.NodeMessage, String, Node] {
     def node(bytes: Array[Byte]) = Node(bytes)
     def addNode(subject: Node) = Messages.AddNode(subject)
     def removeNode(subject: Node) = Messages.RemoveNode(subject)
@@ -89,13 +91,13 @@ object ServiceRegistry {
     def nodeRemoved(subject: Node) = Messages.NodeRemoved(subject)
   }
 
-  private[borg] case class AvailableNodesConfig(zookeeper: ZooKeeperClient, data: ConcurrentMap[Long, Node]) extends ZooKeeperRegistryConfig[Messages.NodeMessage, Long, Node] {
+  private[borg] case class AvailableNodesConfig(zookeeper: ZooKeeperClient, data: ConcurrentMap[String, Node]) extends ZooKeeperRegistryConfig[Messages.NodeMessage, String, Node] {
     val rootNode = "/members"
 
     val messageProvider = new AvailableNodesMessageProvider
   }
 
-  private class AvailableNodes(config: AvailableNodesConfig) extends ZooKeeperRegistry[Messages.NodeMessage, Long, Node](config)
+  private class AvailableNodes(config: AvailableNodesConfig) extends ZooKeeperRegistry[Messages.NodeMessage, String, Node](config)
 
   private[borg] class AvailableServicesMessageProvider extends ZooKeeperRegistryMessageProvider[Messages.ServiceMessage, String, Service] {
     def node(bytes: Array[Byte]) = Service(bytes)
@@ -158,9 +160,9 @@ class ServiceRegistry(context: ServiceRegistryContext) extends Actor with Loggin
 
   self.faultHandler = OneForOneStrategy(List(classOf[Throwable]), 5, 10000)
 
-  private val availableServers: ConcurrentMap[Long, Node] = context.members
+  private val availableServers: ConcurrentMap[String, Node] = context.members
   private val availableServices: ConcurrentMap[String, Service] = context.services
-  private val listeners = new collection.mutable.HashSet[ServiceRegistryListener]
+  private val listeners = HashSet[ServiceRegistryListener]()
 
   private lazy val worker = actorOf(new ServiceRegistryActor(context))
 
@@ -187,8 +189,15 @@ class ServiceRegistry(context: ServiceRegistryContext) extends Actor with Loggin
     case RemoveListener(listener) ⇒ listeners -= listener
     case GetNode(id)              ⇒ self tryReply (availableServers get id)
     case GetService(name)         ⇒ self tryReply (availableServices get name)
-    case m: ServiceRegistryEvent  ⇒ notifyListeners(m)
-    case m: NodeMessage           ⇒ worker forward m
-    case m: ServiceMessage        ⇒ worker forward m
+    case NodeForService(service) ⇒ {
+      val nodes = availableServers.values filter (_.services.contains(service))
+      // TODO: Make this more intelligent by picking a leader when there are more than one possibilities
+      val node = nodes.headOption
+      // TODO: Kick off deployment of the service when there are no services available on the nodes by that name
+      self tryReply (node getOrElse ServiceUnavailable)
+    }
+    case m: ServiceRegistryEvent ⇒ notifyListeners(m)
+    case m: NodeMessage          ⇒ worker forward m
+    case m: ServiceMessage       ⇒ worker forward m
   }
 }

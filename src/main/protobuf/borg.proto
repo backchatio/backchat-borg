@@ -30,7 +30,7 @@ message BorgMessage {
 
 message Node {
 
-  required uint64 id = 1;
+  required string id = 1;
   required string url = 2;
   repeated string capabilities = 3;
   repeated string services = 4;

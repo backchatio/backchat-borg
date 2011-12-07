@@ -12,8 +12,10 @@ object Messages extends Logging {
 
   sealed class InvalidMessageException(borgMessage: BorgMessage) extends BorgException("Couldn't parse message: %s".format(borgMessage))
   sealed trait HiveMessage extends BorgMessageWrapper
-  sealed trait HiveRequest extends HiveMessage
-  sealed trait HiveControlRequest extends HiveRequest
+  sealed trait HiveRequest extends HiveMessage {
+    def target: String
+  }
+  sealed trait HiveControlRequest extends HiveMessage
 
   sealed abstract class ControlRequest(val name: Symbol) extends HiveControlRequest {
     val unwrapped = BorgMessage(BorgMessage.MessageType.System, "", ApplicationEvent(name))
@@ -60,16 +62,5 @@ object Messages extends Logging {
       case m ⇒ throw new InvalidMessageException(m)
     }
   }
-
-  //  def unapply(msg: ZMQMessage) = BorgMessage(msg.frames.last.payload) match {
-  //    case BorgMessage(MessageType.System, _, ApplicationEvent('pong, _), _, _) => Pong.some
-  //    case BorgMessage(MessageType.FireForget, target, data, _, null) => Tell(target, data).some
-  //    case BorgMessage(MessageType.FireForget, target, data, _, ccid) => Tell(target, data, ccid).some
-  //    case BorgMessage(MessageType.RequestReply, target, data, Some(sender), null) => Ask(target, sender, data).some
-  //    case BorgMessage(MessageType.RequestReply, target, data, Some(sender), ccid) => Ask(target, sender, data, ccid).some
-  //    case BorgMessage(MessageType.RequestReply, target, data, None, null) => Reply(target, data).some
-  //    case BorgMessage(MessageType.RequestReply, target, data, None, ccid) => Reply(target, data, ccid).some
-  //    case m => None
-  //  }
 
 }

@@ -17,7 +17,7 @@ object Node {
   }
 }
 
-case class Node(id: Long, url: String, capabilities: Seq[String], services: Seq[String]) extends Subject[Long] {
+case class Node(id: String, url: String, capabilities: Seq[String], services: Seq[String]) extends Subject[String] {
 
   type ProtoBufMessage = Protos.Node
 
