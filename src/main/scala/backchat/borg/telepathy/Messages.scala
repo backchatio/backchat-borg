@@ -7,6 +7,7 @@ import borg.BorgMessage.MessageType
 import akka.zeromq.ZMQMessage
 import scalaz._
 import Scalaz._
+import net.liftweb.json.JsonAST.{ JValue, JString }
 
 object Messages extends Logging {
 
@@ -21,18 +22,21 @@ object Messages extends Logging {
     val unwrapped = BorgMessage(BorgMessage.MessageType.System, "", ApplicationEvent(name))
   }
   case object Ping extends ControlRequest('ping)
-  case object Ready extends ControlRequest('ready)
   case object Hello extends ControlRequest('hello)
 
   case class Tell(target: String, payload: ApplicationEvent, ccid: Uuid = newUuid) extends HiveRequest {
-    def unwrapped = BorgMessage(BorgMessage.MessageType.FireForget, target, payload)
+    def unwrapped = BorgMessage(BorgMessage.MessageType.FireForget, target, payload, ccid = ccid)
   }
-  case class Shout(target: String, payload: ApplicationEvent, ccid: Uuid = newUuid) extends HiveRequest {
-    def unwrapped = BorgMessage(BorgMessage.MessageType.PubSub, target, payload)
+  case class Shout(target: String, payload: JValue, ccid: Uuid = newUuid) extends HiveRequest {
+    def unwrapped = BorgMessage(BorgMessage.MessageType.PubSub, target, ApplicationEvent('publish, payload), Some("publish"), ccid)
   }
 
-  case class Listen(target: String, payload: ApplicationEvent, ccid: Uuid = newUuid) extends HiveRequest {
-    def unwrapped = BorgMessage(BorgMessage.MessageType.PubSub, target, payload)
+  case class Listen(target: String, topic: String, ccid: Uuid = newUuid) extends HiveRequest {
+    def unwrapped = BorgMessage(BorgMessage.MessageType.PubSub, target, ApplicationEvent('listen, JString(topic)), Some("subscribe"), ccid)
+  }
+
+  case class Deafen(target: String, topic: String, ccid: Uuid = newUuid) extends HiveRequest {
+    def unwrapped = BorgMessage(BorgMessage.MessageType.PubSub, target, ApplicationEvent('deafen, JString(topic)), Some("unsubscribe"), ccid)
   }
 
   object Ask {

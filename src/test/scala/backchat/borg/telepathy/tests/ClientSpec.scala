@@ -18,7 +18,24 @@ class ClientSpec extends MojollySpecification { def is =
   "A telepathic client should" ^
     "when responding to messages" ^
       "handle an enqueue message" ! context.handlesEnqueue ^
-      "handle a request message" ! context.handlesRequest ^ end
+      "handle a request message" ! context.handlesRequest ^
+      "publish messages to a pubsub server" ! pending ^
+      "subscribe to all pubsub messages" ! pending ^
+      "unsubscribe from all pubsub messages" ! pending ^
+      "subscribe to specific topics" ! pending ^
+      "unsubscribe from specific topics" ! pending ^
+    "when providing reliability" ^
+      "expect a hug when the tell was received by the server" ! pending ^
+      "expect a hug when the ask was received by the server" ! pending ^
+      "expect a hug when the shout message was received by the server" ! pending ^
+      "expect a hug when the listen message was received by the server" ! pending ^
+      "expect a hug when the deafen message was received by the server" ! pending ^
+      "reschedule a tell message when no hug received within the time limt" ! pending ^
+      "reschedule an ask message when no hug received within the time limt" ! pending ^
+      "reschedule a shout message when no hug received within the time limt" ! pending ^
+      "reschedule a listen message when no hug received within the time limt" ! pending ^
+      "reschedule a deafen message when no hug received within the time limt" ! pending ^
+    end
   
   def context = new ClientSpecContext
   
