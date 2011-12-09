@@ -6,13 +6,16 @@ import scalaz._
 import Scalaz._
 import com.twitter.zookeeper.ZooKeeperClientConfig
 import collection.mutable
-import telepathy.Messages.HiveRequest
+import telepathy.Messages._
 import telepathy.{ TelepathAddress, TelepathClientConfig, Client }
 import backchat.borg.{ Node ⇒ BorgNode }
 import backchat.borg.ServiceRegistry.Messages.AddNode
 
-case class HiveClientContext(clientId: String, hostName: String, ipAddress: String, port: Int, provides: Seq[String])
+case class HiveClientContext(clientId: String, hostName: String, ipAddress: String, port: Int, provides: Seq[String] = Nil, join: Boolean = false) {
+
+}
 case class ActiveService(nodeId: String, connection: ActorRef)
+
 object HiveClient {
 
   object Messages {

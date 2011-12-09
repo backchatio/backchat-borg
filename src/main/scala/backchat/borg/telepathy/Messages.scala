@@ -27,6 +27,14 @@ object Messages extends Logging {
   case class Tell(target: String, payload: ApplicationEvent, ccid: Uuid = newUuid) extends HiveRequest {
     def unwrapped = BorgMessage(BorgMessage.MessageType.FireForget, target, payload)
   }
+  case class Shout(target: String, payload: ApplicationEvent, ccid: Uuid = newUuid) extends HiveRequest {
+    def unwrapped = BorgMessage(BorgMessage.MessageType.PubSub, target, payload)
+  }
+
+  case class Listen(target: String, payload: ApplicationEvent, ccid: Uuid = newUuid) extends HiveRequest {
+    def unwrapped = BorgMessage(BorgMessage.MessageType.PubSub, target, payload)
+  }
+
   object Ask {
     def apply(target: String, payload: ApplicationEvent): Ask = {
       Ask(target, "sender", payload)
