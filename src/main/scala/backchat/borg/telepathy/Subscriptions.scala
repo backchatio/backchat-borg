@@ -12,8 +12,8 @@ object Subscriptions {
 
     self.id = "borg-local-subscriptions"
 
-    private var topicSubscriptions = Map[String, Set[ActorRef]]()
-    private var globalSubscriptions = Set[ActorRef]()
+    private[telepathy] var topicSubscriptions = Map[String, Set[ActorRef]]()
+    private[telepathy] var globalSubscriptions = Set[ActorRef]()
 
     private def subscribe(topic: String, subscriber: ActorRef) {
       logger debug ("Subscribing to: %s" format topic)

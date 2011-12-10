@@ -10,6 +10,7 @@ import org.specs2.execute.Result
 import akka.actor.ActorRef
 import akka.zeromq.{ ZMQMessage, Frame }
 import collection.mutable.ListBuffer
+import akka.testkit.{ TestKit, TestActorRef }
 
 object TestTelepathyServer {
   type ZMessageHandler = Seq[Frame] ⇒ Any
@@ -112,7 +113,7 @@ class ZeroMQPoller(context: Context) {
   def isEmpty = size > 0
 }
 
-trait ZeroMqContext extends Around {
+trait ZeroMqContext extends Around with TestKit {
 
   val deser = new BorgZMQMessageSerializer
 
@@ -127,7 +128,7 @@ trait ZeroMqContext extends Around {
   }
 
   def withServer[T](socketType: Int = ZMQ.XREP)(fn: TestTelepathyServer.Server ⇒ T)(implicit evidence$1: (T) ⇒ Result): T = {
-    require(zmqContext.isNotNull)
+    require(zmqContext.isNotNull, "Did you wrap the test method with a `this { ... }`?")
     val poller = new ZeroMQPoller(zmqContext)
     val kv = TestTelepathyServer(zmqContext, poller, socketType = socketType)
     val res = fn(kv)
@@ -135,8 +136,8 @@ trait ZeroMqContext extends Around {
     res
   }
 
-  def withClient[T](address: TelepathAddress)(fn: ActorRef ⇒ T)(implicit evidence$1: (T) ⇒ Result): T = {
-    val client = newTelepathicClient(address.address)
+  def withClient[T](address: TelepathAddress, subscriptionManager: Option[ActorRef] = None)(fn: ActorRef ⇒ T)(implicit evidence$1: (T) ⇒ Result): T = {
+    val client = TestActorRef(new Client(TelepathClientConfig(address, subscriptionManager = subscriptionManager))).start()
     val res = fn(client)
     client.stop()
     res

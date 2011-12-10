@@ -10,18 +10,21 @@ import akka.zeromq.Frame
 import BorgMessage.MessageType
 import telepathy.Messages._
 import akka.actor._
-import mojolly.testing.MojollySpecification
 import org.multiverse.api.latches.StandardLatch
+import net.liftweb.json._
+import mojolly.testing.{AkkaSpecification}
+import akka.testkit.TestActorRef
 
-
-class ClientSpec extends MojollySpecification { def is =
+class ClientSpec extends AkkaSpecification { def is =
   "A telepathic client should" ^
     "when responding to messages" ^
       "handle an enqueue message" ! context.handlesEnqueue ^
       "handle a request message" ! context.handlesRequest ^
       "publish messages to a pubsub server" ! context.handlesShout ^
       "subscribe to pubsub topics" ! context.handlesListen ^
+      "add the subscription to the subscription manager" ! context.addsSubscriptionToManager ^
       "unsubscribe from pubsub topics" ! context.handlesDeafen ^
+      "remove subscription from the subscription manager" ! context.removesSubscriptionFromManager ^bt ^
     "when providing reliability" ^
       "expect a hug when the tell was received by the server" ! context.expectsHugForTell ^
       "expect a hug when the ask was received by the server" ! context.expectsHugForAsk ^
@@ -89,7 +92,6 @@ class ClientSpec extends MojollySpecification { def is =
           
           server onMessage { (frames: Seq[Frame]) =>
             val msg = zmqMessage(frames)
-            println("Received: %s" format msg)
             msg match {
               case BorgMessage(MessageType.PubSub, "target", `appEvt`, Some("publish"), _) => {
                 latch.open()
@@ -105,9 +107,51 @@ class ClientSpec extends MojollySpecification { def is =
       }
     }
     
-    def handlesListen = pending
+    def handlesListen = this {
+      withServer() { server => 
+        val subscriptionmanager = Actor.actorOf[Subscriptions.LocalSubscriptions].start()
+        withClient(server.address, Some(subscriptionmanager)) { client =>
+          val topic = "the-topic"
+          val latch = new StandardLatch()
+          server onMessage { (frames: Seq[Frame]) =>
+            zmqMessage(frames) match {
+              case BorgMessage(MessageType.PubSub, `topic`, ApplicationEvent('listen, JNothing), _, _) =>
+                latch.open
+              case _ =>
+            }
+          }
+          client ! Listen(topic)
+          server poll 2.seconds
+          latch.tryAwait(2, TimeUnit.SECONDS) must beTrue
+        }
+      }
+    }
+
+    def addsSubscriptionToManager = this {
+      withServer() { server => 
+        val subscriptionManager = TestActorRef[Subscriptions.LocalSubscriptions].start()
+        withClient(server.address, subscriptionManager = Some(subscriptionManager)) { client =>
+          val topic = "the-topic"
+          val latch = new StandardLatch()
+          server onMessage { (frames: Seq[Frame]) =>
+            zmqMessage(frames) match {
+              case BorgMessage(MessageType.PubSub, `topic`, ApplicationEvent('listen, JNothing), _, _) =>
+                latch.open
+              case _ =>
+            }
+          }
+          client ! Listen(topic)
+          server poll 2.seconds
+          val res = latch.tryAwait(2, TimeUnit.SECONDS) must beTrue
+          val subs = subscriptionManager.underlyingActor.topicSubscriptions 
+          res and (subs must not beEmpty) and (subs(topic) must_== Set(testActor))
+        }
+      }
+    }
     
     def handlesDeafen = pending
+
+    def removesSubscriptionFromManager = pending
     
     def expectsHugForTell = pending
     

@@ -25,17 +25,17 @@ class Client(config: TelepathClientConfig) extends Telepath {
   }
 
   protected def receive = happyGoLucky
-  
+
   protected def manageLifeCycle: Receive = {
     case Init ⇒ {
       socket ! Connect(config.server.address)
       logger trace "Establishing connection to server"
     }
-    case Paranoid => {
+    case Paranoid ⇒ {
       become(paranoid)
       // TODO: start pinging
     }
-    case HappyGoLucky => {
+    case HappyGoLucky ⇒ {
       // TODO: check if pings are active and disable those
       become(happyGoLucky)
     }
@@ -45,9 +45,9 @@ class Client(config: TelepathClientConfig) extends Telepath {
     }
     case Closed ⇒ {
       logger debug "Socket connection closed"
-    }    
+    }
   }
-  
+
   protected def paranoid: Receive = manageLifeCycle orElse { // TODO: Actually provide the reliabillity
     case m: Tell ⇒ {
       logger trace "enqueuing a message to a server: %s".format(m)
@@ -72,7 +72,7 @@ class Client(config: TelepathClientConfig) extends Telepath {
       logger trace "Sending unsubscribe to a server: %s".format(m)
       subscriptionManager ! (m, self.sender.get)
     }
-    case Do(req) ⇒ sendToSocket(m) // subscription manager callbacks
+    case Do(req) ⇒ sendToSocket(req) // subscription manager callbacks
     case m: ZMQMessage ⇒ deserialize(m) match { // incoming message handler
       case rep: Reply ⇒ {
         logger trace "processing a reply: %s".format(rep)
@@ -82,9 +82,12 @@ class Client(config: TelepathClientConfig) extends Telepath {
         logger trace "processing publish to local subscriptions: %s".format(shout)
         subscriptionManager ! shout
       }
+      case Pong ⇒ { //TODO: Handle Pong
+
+      }
     }
   }
-  
+
   protected def sendToSocket(m: HiveRequest) = {
     socket ! serialize(m)
   }
@@ -113,7 +116,7 @@ class Client(config: TelepathClientConfig) extends Telepath {
       logger trace "Sending unsubscribe to a server: %s".format(m)
       subscriptionManager ! (m, self.sender.get)
     }
-    case Do(req) ⇒ sendToSocket(m) // subscription manager callbacks
+    case Do(req) ⇒ sendToSocket(req) // subscription manager callbacks
     case m: ZMQMessage ⇒ deserialize(m) match { // incoming message handler
       case rep: Reply ⇒ {
         logger trace "processing a reply: %s".format(rep)
@@ -123,7 +126,7 @@ class Client(config: TelepathClientConfig) extends Telepath {
         logger trace "processing publish to local subscriptions: %s".format(shout)
         subscriptionManager ! shout
       }
-      case Pong => //ignore
+      case Pong ⇒ //ignore
     }
   }
 
