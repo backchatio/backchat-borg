@@ -83,6 +83,6 @@ class Client(config: TelepathClientConfig) extends Telepath {
       subs
     }
   }
-  
+
   private def realSupervisor: ActorRef = self.supervisor getOrElse self
 }

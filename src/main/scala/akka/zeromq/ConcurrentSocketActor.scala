@@ -3,13 +3,11 @@
  */
 package akka.zeromq
 
-import akka.actor.{ Actor, ReceiveTimeout }
+import akka.actor.Actor
 import org.zeromq.ZMQ.{ Socket, Poller }
 import org.zeromq.{ ZMQ ⇒ JZMQ }
 import java.nio.charset.Charset
 import akka.dispatch.{ Future, MessageDispatcher }
-import scalaz._
-import Scalaz._
 import akka.event.EventHandler
 
 private[zeromq] class ConcurrentSocketActor(params: SocketParameters, dispatcher: MessageDispatcher) extends Actor {
@@ -17,7 +15,6 @@ private[zeromq] class ConcurrentSocketActor(params: SocketParameters, dispatcher
   private val noBytes = Array[Byte]()
   private val socket: Socket = params.context.socket(params.socketType)
   private val poller: Poller = params.context.poller
-
 
   self.dispatcher = dispatcher
 
@@ -63,29 +60,31 @@ private[zeromq] class ConcurrentSocketActor(params: SocketParameters, dispatcher
   }
 
   private var currentPoll: Option[Future[Boolean]] = None
-  private def pollAndReceiveFrames(ignoreCurrent: Boolean = false) {
-    if (ignoreCurrent || currentPoll.isEmpty) {
-      currentPoll = Some(
-        Future {
-          poller.poll(params.pollTimeoutDuration.toMillis) > 0 && poller.pollin(0)
-        } onResult {
-          case true ⇒ {
-            receiveFrames() match {
-              case Seq() ⇒ pollAndReceiveFrames(true)
-              case frames ⇒ {
-                notifyListener(params.deserializer(frames))
-                pollAndReceiveFrames(true)
-              }
-            }
-          }
-          case _ ⇒ pollAndReceiveFrames(true)
-        } onException {
-          case ex ⇒ {
-            EventHandler.error(ex, this, "There was an error receiving messages on the zeromq socket")
-            pollAndReceiveFrames(true)
-          }
-        })
+  private def pollAndReceiveFrames() {
+    currentPoll = currentPoll orElse Some(newEventLoop)
+  }
+
+  private def newEventLoop =
+    Future {
+      poller.poll(params.pollTimeoutDuration.toMillis) > 0 && poller.pollin(0)
+    } onComplete { fut ⇒
+      if (fut.get) {
+        receiveFrames() match {
+          case Seq()  ⇒
+          case frames ⇒ notifyListener(params.deserializer(frames))
+        }
+      }
+      reschedule()
+    } onException {
+      case ex ⇒ {
+        EventHandler.error(ex, this, "There was an error receiving messages on the zeromq socket")
+        reschedule()
+      }
     }
+
+  private def reschedule() {
+    currentPoll = None
+    pollAndReceiveFrames()
   }
 
   private def receiveFrames(): Seq[Frame] = {
