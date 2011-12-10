@@ -143,15 +143,55 @@ class ClientSpec extends AkkaSpecification { def is =
           client ! Listen(topic)
           server poll 2.seconds
           val res = latch.tryAwait(2, TimeUnit.SECONDS) must beTrue
-          val subs = subscriptionManager.underlyingActor.topicSubscriptions 
+          val subs = subscriptionManager.underlyingActor.topicSubscriptions
           res and (subs must not beEmpty) and (subs(topic) must_== Set(testActor))
         }
       }
     }
     
-    def handlesDeafen = pending
+    def handlesDeafen = this {
+      withServer() { server =>
+        val subscriptionmanager = Actor.actorOf[Subscriptions.LocalSubscriptions].start()
+        withClient(server.address, Some(subscriptionmanager)) { client =>
+          val topic = "the-topic"
+          val latch = new StandardLatch()
+          server onMessage { (frames: Seq[Frame]) =>
+            zmqMessage(frames) match {
+              case BorgMessage(MessageType.PubSub, `topic`, ApplicationEvent('deafen, JNothing), _, _) =>
+                latch.open
+              case _ =>
+            }
+          }
+          client ! Listen(topic)
+          client ! Deafen(topic)
+          2 times { server poll 2.seconds }
+          latch.tryAwait(2, TimeUnit.SECONDS) must beTrue
+        }
+      }
+    }
 
-    def removesSubscriptionFromManager = pending
+    def removesSubscriptionFromManager = this {
+      withServer() { server =>
+        val subscriptionManager = TestActorRef[Subscriptions.LocalSubscriptions].start()
+        withClient(server.address, subscriptionManager = Some(subscriptionManager)) { client =>
+          val topic = "the-topic"
+          val latch = new StandardLatch()
+          server onMessage { (frames: Seq[Frame]) =>
+            zmqMessage(frames) match {
+              case BorgMessage(MessageType.PubSub, `topic`, ApplicationEvent('deafen, JNothing), _, _) =>
+                latch.open
+              case _ =>
+            }
+          }
+          client ! Listen(topic)
+          client ! Deafen(topic)
+          2 times { server poll 2.seconds }
+          val res = latch.tryAwait(2, TimeUnit.SECONDS) must beTrue
+          val subs = subscriptionManager.underlyingActor.topicSubscriptions
+          res and (subs must beEmpty)
+        }
+      }
+    }
     
     def expectsHugForTell = pending
     
