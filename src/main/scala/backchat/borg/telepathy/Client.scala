@@ -7,12 +7,12 @@ import Actor._
 import akka.zeromq._
 import telepathy.Messages._
 import telepathy.Subscriptions.Do
-import akka.dispatch.{ Future, CompletableFuture }
 import mojolly.Delay
+import akka.dispatch.{ ActorCompletableFuture, Future, CompletableFuture }
 
 case class TelepathClientConfig(server: TelepathAddress, listener: Option[ActorRef] = None, subscriptionManager: Option[ActorRef] = None)
 case class ExpectedHug(
-    sender: ActorRef,
+    sender: UntypedChannel,
     count: Int, timeout: Duration,
     private var timeoutHandlers: Vector[() ⇒ Any] = Vector.empty) {
 
@@ -82,6 +82,7 @@ class Client(config: TelepathClientConfig) extends Telepath {
     }
     case m: Ask ⇒ {
       logger trace "Sending a request to a server: %s".format(m)
+      println("Sending a request to a server: %s".format(m))
       self.senderFuture foreach { fut ⇒
         activeRequests += m.ccid -> fut
         sendToSocketAndExpectHug(m)
@@ -122,8 +123,17 @@ class Client(config: TelepathClientConfig) extends Telepath {
 
   protected def sendToSocketAndExpectHug(m: HiveRequest) = {
     expectedHugs += m.ccid -> {
-      ExpectedHug(self.sender.get, 1, 1.second) onTimeout {
-        expectedHugs += m.ccid -> expectedHugs(m.ccid).incrementCount
+      ExpectedHug(self.channel, 1, 1.second) onTimeout {
+        expectedHugs.get(m.ccid) foreach { hug ⇒
+          if (hug.count >= 5) {
+            expectedHugs += m.ccid -> hug.incrementCount
+          } else {
+            hug.sender match {
+              case f: ActorCompletableFuture ⇒ f.complete(Right(RescheduleRequest(m)))
+              case f: ActorRef               ⇒ f ! RescheduleRequest(m)
+            }
+          }
+        }
       }
     }
     sendToSocket(m)
