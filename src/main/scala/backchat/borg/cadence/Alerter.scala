@@ -71,7 +71,7 @@ object Alerter {
     val applicationName = "Alerter"
     val alerter = AlerterContext(
       "http://%s" format (reporting map (_.host) getOrElse "graphite"),
-      config.getSection("mojolly.reporting") flatMap (_.getInt("pollInterval")),
+      config.getSection("mojolly.reporting") flatMap (_.getInt("pollInterval")) getOrElse 60,
       config.getSection("mojolly.borg.cadence.alerts") map { section ⇒
         section.keys map { k ⇒
           val key = k.split("\\.", 2).head
@@ -80,11 +80,10 @@ object Alerter {
             section.getDouble(key + ".error").get,
             section.getDouble(key + ".warn").get)
         }
-      } getOrElse Nil
-    )
+      } getOrElse Nil)
   }
 
-  case class AlerterContext(url: String, period: Int, alerts: Seq[Alert])
+  case class AlerterContext(url: String, period: Int, alerts: Iterable[Alert])
   case class Alert(target: String, warn: Double, error: Double, window: Duration = 5.minutes)
 
   case class GraphiteResponse(metrics: List[Metric])

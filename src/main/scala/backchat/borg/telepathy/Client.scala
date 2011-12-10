@@ -5,7 +5,7 @@ package telepathy
 import akka.actor._
 import akka.zeromq._
 import akka.dispatch.CompletableFuture
-import telepathy.Messages.{ Reply, Ask, Tell }
+import telepathy.Messages._
 
 case class TelepathClientConfig(server: TelepathAddress, listener: Option[ActorRef] = None)
 
@@ -34,6 +34,18 @@ class Client(config: TelepathClientConfig) extends Telepath {
         activeRequests += m.ccid -> fut
         socket ! serialize(m)
       }
+    }
+    case m: Shout ⇒ {
+      logger trace "Sending publish to a server: %s".format(m)
+      socket ! serialize(m)
+    }
+    case m: Listen ⇒ {
+      logger trace "Sending subscribe to a server: %s".format(m)
+      socket ! serialize(m)
+    }
+    case m: Deafen ⇒ {
+      logger trace "Sending unsubscribe to a server: %s".format(m)
+      socket ! serialize(m)
     }
     case m: ZMQMessage ⇒ deserialize(m) match {
       case rep: Reply ⇒ {

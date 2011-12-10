@@ -27,16 +27,16 @@ object Messages extends Logging {
   case class Tell(target: String, payload: ApplicationEvent, ccid: Uuid = newUuid) extends HiveRequest {
     def unwrapped = BorgMessage(BorgMessage.MessageType.FireForget, target, payload, ccid = ccid)
   }
-  case class Shout(target: String, payload: JValue, ccid: Uuid = newUuid) extends HiveRequest {
-    def unwrapped = BorgMessage(BorgMessage.MessageType.PubSub, target, ApplicationEvent('publish, payload), Some("publish"), ccid)
+  case class Shout(target: String, payload: JValue) extends HiveRequest {
+    def unwrapped = BorgMessage(BorgMessage.MessageType.PubSub, target, ApplicationEvent('publish, payload), Some("publish"))
   }
 
-  case class Listen(target: String, topic: String, ccid: Uuid = newUuid) extends HiveRequest {
-    def unwrapped = BorgMessage(BorgMessage.MessageType.PubSub, target, ApplicationEvent('listen, JString(topic)), Some("subscribe"), ccid)
+  case class Listen(target: String) extends HiveRequest {
+    def unwrapped = BorgMessage(BorgMessage.MessageType.PubSub, target, ApplicationEvent('listen), Some("subscribe"))
   }
 
-  case class Deafen(target: String, topic: String, ccid: Uuid = newUuid) extends HiveRequest {
-    def unwrapped = BorgMessage(BorgMessage.MessageType.PubSub, target, ApplicationEvent('deafen, JString(topic)), Some("unsubscribe"), ccid)
+  case class Deafen(target: String) extends HiveRequest {
+    def unwrapped = BorgMessage(BorgMessage.MessageType.PubSub, target, ApplicationEvent('deafen), Some("unsubscribe"))
   }
 
   object Ask {
@@ -50,7 +50,7 @@ object Messages extends Logging {
   }
 
   sealed trait HiveResponse extends HiveMessage
-  sealed trait HiveControlResponse extends HiveResponse
+  sealed trait HiveControlResponse extends HiveMessage
 
   sealed abstract class ControlResponse(val name: Symbol) extends HiveControlResponse {
     val unwrapped = BorgMessage(MessageType.System, "", ApplicationEvent(name))

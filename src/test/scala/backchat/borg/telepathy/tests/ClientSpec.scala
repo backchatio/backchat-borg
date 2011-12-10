@@ -5,13 +5,13 @@ package tests
 
 import org.zeromq.ZMQ
 import net.liftweb.json.JsonAST.{JArray, JString}
-import org.multiverse.api.latches.StandardLatch
 import java.util.concurrent.TimeUnit
 import akka.zeromq.Frame
 import BorgMessage.MessageType
 import telepathy.Messages._
 import akka.actor._
 import mojolly.testing.MojollySpecification
+import org.multiverse.api.latches.StandardLatch
 
 
 class ClientSpec extends MojollySpecification { def is =
@@ -19,11 +19,11 @@ class ClientSpec extends MojollySpecification { def is =
     "when responding to messages" ^
       "handle an enqueue message" ! context.handlesEnqueue ^
       "handle a request message" ! context.handlesRequest ^
-      "publish messages to a pubsub server" ! pending ^
+      "publish messages to a pubsub server" ! context.handlesShout ^
       "subscribe to all pubsub messages" ! pending ^
       "unsubscribe from all pubsub messages" ! pending ^
       "subscribe to specific topics" ! pending ^
-      "unsubscribe from specific topics" ! pending ^
+      "unsubscribe from specific topics" ! pending ^ bt ^
     "when providing reliability" ^
       "expect a hug when the tell was received by the server" ! pending ^
       "expect a hug when the ask was received by the server" ! pending ^
@@ -78,6 +78,30 @@ class ClientSpec extends MojollySpecification { def is =
           val req = client ? Ask("target", appEvt)
           server poll 2.seconds
           req.as[ApplicationEvent] must beSome(appEvt2)
+        }
+      }
+    }
+    
+    def handlesShout = this {
+      withServer() { server => 
+        withClient(server.address) { client => 
+          val appEvt = ApplicationEvent('pingping, JArray(JString("the message") :: Nil)).toJValue
+          val latch = new StandardLatch()
+          
+          server onMessage { (frames: Seq[Frame]) =>
+            val msg = zmqMessage(frames)
+            println("Received: %s" format msg)
+            msg match {
+              case BorgMessage(MessageType.PubSub, "target", ApplicationEvent('publish, `appEvt`), Some("publish"), _) => {
+                latch.open()
+              }
+              case _ =>
+            }
+          }
+          
+          client ! Shout("target", appEvt)
+          server poll 2.seconds
+          latch.tryAwait(2, TimeUnit.SECONDS) must beTrue
         }
       }
     }
