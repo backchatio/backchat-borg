@@ -20,21 +20,19 @@ class ClientSpec extends MojollySpecification { def is =
       "handle an enqueue message" ! context.handlesEnqueue ^
       "handle a request message" ! context.handlesRequest ^
       "publish messages to a pubsub server" ! context.handlesShout ^
-      "subscribe to all pubsub messages" ! pending ^
-      "unsubscribe from all pubsub messages" ! pending ^
-      "subscribe to specific topics" ! pending ^
-      "unsubscribe from specific topics" ! pending ^ bt ^
+      "subscribe to pubsub topics" ! context.handlesListen ^
+      "unsubscribe from pubsub topics" ! context.handlesDeafen ^
     "when providing reliability" ^
-      "expect a hug when the tell was received by the server" ! pending ^
-      "expect a hug when the ask was received by the server" ! pending ^
-      "expect a hug when the shout message was received by the server" ! pending ^
-      "expect a hug when the listen message was received by the server" ! pending ^
-      "expect a hug when the deafen message was received by the server" ! pending ^
-      "reschedule a tell message when no hug received within the time limt" ! pending ^
-      "reschedule an ask message when no hug received within the time limt" ! pending ^
-      "reschedule a shout message when no hug received within the time limt" ! pending ^
-      "reschedule a listen message when no hug received within the time limt" ! pending ^
-      "reschedule a deafen message when no hug received within the time limt" ! pending ^
+      "expect a hug when the tell was received by the server" ! context.expectsHugForTell ^
+      "expect a hug when the ask was received by the server" ! context.expectsHugForAsk ^
+      "expect a hug when the shout message was received by the server" ! context.expectsHugForShout ^
+      "expect a hug when the listen message was received by the server" ! context.expectsHugForListen ^
+      "expect a hug when the deafen message was received by the server" ! context.expectsHugForDeafen ^
+      "reschedule a tell message when no hug received within the time limt" ! context.handlesNoHugsForTell ^
+      "reschedule an ask message when no hug received within the time limt" ! context.handlesNoHugsForAsk ^
+      "reschedule a shout message when no hug received within the time limt" ! context.handlesNoHugsForShout ^
+      "reschedule a listen message when no hug received within the time limt" ! context.handlesNoHugsForListen ^
+      "reschedule a deafen message when no hug received within the time limt" ! context.handlesNoHugsForDeafen ^
     end
   
   def context = new ClientSpecContext
@@ -105,6 +103,30 @@ class ClientSpec extends MojollySpecification { def is =
         }
       }
     }
+    
+    def handlesListen = pending
+    
+    def handlesDeafen = pending
+    
+    def expectsHugForTell = pending
+    
+    def expectsHugForAsk = pending
+    
+    def expectsHugForShout = pending
+    
+    def expectsHugForListen = pending
+    
+    def expectsHugForDeafen = pending
+    
+    def handlesNoHugsForTell = pending
+    
+    def handlesNoHugsForAsk = pending
+    
+    def handlesNoHugsForShout = pending
+    
+    def handlesNoHugsForListen = pending
+    
+    def handlesNoHugsForDeafen = pending
   }
   
   
