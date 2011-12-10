@@ -59,6 +59,7 @@ class Client(config: TelepathClientConfig) extends Telepath {
     case Paranoid ⇒ {
       println("becoming paranoid")
       become(paranoid)
+      sendToSocket(CanHazHugz)
       // TODO: start pinging
     }
     case HappyGoLucky ⇒ {
@@ -128,7 +129,7 @@ class Client(config: TelepathClientConfig) extends Telepath {
     sendToSocket(m)
   }
 
-  protected def sendToSocket(m: HiveRequest) = {
+  protected def sendToSocket(m: BorgMessageWrapper) = {
     socket ! serialize(m)
   }
 
@@ -166,7 +167,7 @@ class Client(config: TelepathClientConfig) extends Telepath {
         logger trace "processing publish to local subscriptions: %s".format(shout)
         subscriptionManager ! shout
       }
-      case Pong ⇒ //ignore
+      case Pong | _: Hug ⇒ //ignore
     }
   }
 

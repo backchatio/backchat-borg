@@ -11,9 +11,9 @@ import BorgMessage.MessageType
 import akka.actor._
 import net.liftweb.json._
 import mojolly.testing.{AkkaSpecification}
-import akka.testkit.TestActorRef
 import telepathy.Messages._
 import org.multiverse.api.latches.StandardLatch
+import akka.testkit.{TestLatch, TestActorRef}
 
 class ClientSpec extends AkkaSpecification { def is =
   "A telepathic client should" ^
@@ -193,34 +193,42 @@ class ClientSpec extends AkkaSpecification { def is =
       }
     }
     
-    def expectsHugForTell = this {
+    private def expectsHugFor(msg: HiveRequest) = this {
       withServer() { server => 
         withClient(server.address) { client =>
           client ! Paranoid
+          val l1 = TestLatch()
           server onMessage { (frames: Seq[Frame]) => 
-            zmqMessage(frames) match {
-              case BorgMessage(MessageType.FireForget, _, _, _, ccid) => {
+            Messages(zmqMessage(frames)) match {
+              case `msg` => {
                 server.socket.send(frames.head.payload.toArray, ZMQ.SNDMORE)
-                server.socket.send(Hug(ccid).toBytes, 0)
+                server.socket.send(Hug(msg.ccid).toBytes, 0)
               }
+              case CanHazHugz => l1.countDown()
             }
           }
-          val msg = Tell("target", ApplicationEvent('pingping))
-          client ! msg
+          server poll 2.seconds
+          l1 await 10.millis
+          msg match {
+            case _: Ask => client ? msg
+            case _ => client ! msg
+          }
           val r1 = client.underlyingActor.expectedHugs.get(msg.ccid) must beSome[ExpectedHug].eventually
           server poll 2.seconds
           r1 and (client.underlyingActor.expectedHugs.get(msg.ccid) must beNone.eventually)
         }
       }
-    }
+    } 
     
-    def expectsHugForAsk = pending
+    def expectsHugForTell = expectsHugFor(Tell("target", ApplicationEvent('pingping)))
     
-    def expectsHugForShout = pending
+    def expectsHugForAsk = expectsHugFor(Ask("target", ApplicationEvent('pingping)))
     
-    def expectsHugForListen = pending
+    def expectsHugForShout = expectsHugFor(Shout("topic", ApplicationEvent('pingping)))
     
-    def expectsHugForDeafen = pending
+    def expectsHugForListen = expectsHugFor(Listen("topic"))
+    
+    def expectsHugForDeafen = expectsHugFor(Deafen("topic"))
     
     def handlesNoHugsForTell = pending
     

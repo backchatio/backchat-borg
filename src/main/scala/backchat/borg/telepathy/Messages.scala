@@ -8,6 +8,7 @@ import akka.zeromq.ZMQMessage
 import scalaz._
 import Scalaz._
 import net.liftweb.json._
+import java.io.File
 
 object Messages extends Logging {
 
@@ -23,7 +24,7 @@ object Messages extends Logging {
     val unwrapped = BorgMessage(BorgMessage.MessageType.System, "", ApplicationEvent(name))
   }
   case object Ping extends ControlRequest('ping)
-  case object Hello extends ControlRequest('hello)
+  case object CanHazHugz extends ControlRequest('can_haz_hugz)
 
   case class Tell(target: String, payload: ApplicationEvent, ccid: Uuid = newUuid) extends HiveRequest {
     def unwrapped = BorgMessage(BorgMessage.MessageType.FireForget, target, payload, ccid = ccid)
@@ -85,6 +86,7 @@ object Messages extends Logging {
       case BorgMessage(MessageType.PubSub, target, ApplicationEvent('deafen, JNothing), _, null) ⇒ Deafen(target)
       case BorgMessage(MessageType.PubSub, target, ApplicationEvent('deafen, JNothing), _, ccid) ⇒ Deafen(target, ccid)
       case BorgMessage(MessageType.System, _, ApplicationEvent('hug, _), _, ccid) ⇒ Hug(ccid)
+      case BorgMessage(MessageType.System, _, ApplicationEvent('can_haz_hugz, _), _, _) ⇒ CanHazHugz
       case m ⇒ throw new InvalidMessageException(m)
     }
   }
