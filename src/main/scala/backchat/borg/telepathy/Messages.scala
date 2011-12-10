@@ -60,6 +60,11 @@ object Messages extends Logging {
     def unwrapped = BorgMessage(MessageType.RequestReply, target, payload, ccid = ccid)
   }
 
+  sealed trait InternalMessage
+  case object Init extends InternalMessage
+  case object HappyGoLucky extends InternalMessage
+  case object Paranoid extends InternalMessage
+
   def apply(bytes: Seq[Byte]): BorgMessageWrapper = Messages(BorgMessage(bytes))
   def apply(msg: BorgMessage): BorgMessageWrapper = {
     logger debug "Converting message: %s".format(msg)
