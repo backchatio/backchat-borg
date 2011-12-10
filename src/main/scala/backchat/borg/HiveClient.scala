@@ -55,11 +55,13 @@ object HiveClient {
           }
         })
       }
-      case m: HiveRequest ⇒ {
-        if (!(activeServices contains m.target))
-          activateClientFor(m) foreach { activeServices(m.target) = _ }
-        activeServices get m.target foreach { _.connection forward m }
-      }
+      case m: HiveRequest ⇒ forwardRequest(m)
+    }
+    
+    protected def forwardRequest(m: HiveRequest) = {
+      if (!(activeServices contains m.target))
+        activateClientFor(m) foreach { activeServices(m.target) = _ }
+      activeServices get m.target foreach { _.connection forward m }
     }
 
     protected def activateClientFor(m: HiveRequest) = {

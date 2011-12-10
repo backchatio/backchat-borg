@@ -8,6 +8,7 @@ import mojolly.testing.MojollySpecification
 class ServerSpec extends MojollySpecification { def is =
   "A Server should" ^
     "respond with pong when receiving a ping" ! pending ^
+    "tracks active client sessions" ! pending ^
     "when receiving a tell message" ^
       controlMessages(null) ^
     "when receiving an ask message" ^

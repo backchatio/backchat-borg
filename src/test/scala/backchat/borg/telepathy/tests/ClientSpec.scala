@@ -33,6 +33,7 @@ class ClientSpec extends MojollySpecification { def is =
       "reschedule a shout message when no hug received within the time limt" ! context.handlesNoHugsForShout ^
       "reschedule a listen message when no hug received within the time limt" ! context.handlesNoHugsForListen ^
       "reschedule a deafen message when no hug received within the time limt" ! context.handlesNoHugsForDeafen ^
+      "send pings to the server if no activity for the specified period" ! context.sendsPings ^
     end
   
   def context = new ClientSpecContext
@@ -127,6 +128,8 @@ class ClientSpec extends MojollySpecification { def is =
     def handlesNoHugsForListen = pending
     
     def handlesNoHugsForDeafen = pending
+
+    def sendsPings = pending
   }
   
   
