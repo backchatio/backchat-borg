@@ -7,7 +7,7 @@ import borg.BorgMessage.MessageType
 import akka.zeromq.ZMQMessage
 import scalaz._
 import Scalaz._
-import net.liftweb.json.JsonAST.{ JValue, JString }
+import net.liftweb.json._
 
 object Messages extends Logging {
 
@@ -27,16 +27,16 @@ object Messages extends Logging {
   case class Tell(target: String, payload: ApplicationEvent, ccid: Uuid = newUuid) extends HiveRequest {
     def unwrapped = BorgMessage(BorgMessage.MessageType.FireForget, target, payload, ccid = ccid)
   }
-  case class Shout(target: String, payload: JValue) extends HiveRequest {
-    def unwrapped = BorgMessage(BorgMessage.MessageType.PubSub, target, ApplicationEvent('publish, payload), Some("publish"))
+  case class Shout(target: String, payload: ApplicationEvent, ccid: Uuid = newUuid) extends HiveRequest {
+    def unwrapped = BorgMessage(BorgMessage.MessageType.PubSub, target, payload, Some("publish"), ccid)
   }
 
-  case class Listen(target: String) extends HiveRequest {
-    def unwrapped = BorgMessage(BorgMessage.MessageType.PubSub, target, ApplicationEvent('listen), Some("subscribe"))
+  case class Listen(target: String, ccid: Uuid = newUuid) extends HiveRequest {
+    def unwrapped = BorgMessage(BorgMessage.MessageType.PubSub, target, ApplicationEvent('listen), ccid = ccid)
   }
 
-  case class Deafen(target: String) extends HiveRequest {
-    def unwrapped = BorgMessage(BorgMessage.MessageType.PubSub, target, ApplicationEvent('deafen), Some("unsubscribe"))
+  case class Deafen(target: String, ccid: Uuid = newUuid) extends HiveRequest {
+    def unwrapped = BorgMessage(BorgMessage.MessageType.PubSub, target, ApplicationEvent('deafen), ccid = ccid)
   }
 
   object Ask {
@@ -71,6 +71,12 @@ object Messages extends Logging {
       case BorgMessage(MessageType.RequestReply, target, data, Some(sender), ccid) ⇒ Ask(target, sender, data, ccid)
       case BorgMessage(MessageType.RequestReply, target, data, None, null) ⇒ Reply(target, data)
       case BorgMessage(MessageType.RequestReply, target, data, None, ccid) ⇒ Reply(target, data, ccid)
+      case BorgMessage(MessageType.PubSub, target, data, Some("publish"), null) ⇒ Shout(target, data)
+      case BorgMessage(MessageType.PubSub, target, data, Some("publish"), ccid) ⇒ Shout(target, data, ccid)
+      case BorgMessage(MessageType.PubSub, target, ApplicationEvent('listen, JNothing), _, null) ⇒ Listen(target)
+      case BorgMessage(MessageType.PubSub, target, ApplicationEvent('listen, JNothing), _, ccid) ⇒ Listen(target, ccid)
+      case BorgMessage(MessageType.PubSub, target, ApplicationEvent('deafen, JNothing), _, null) ⇒ Deafen(target)
+      case BorgMessage(MessageType.PubSub, target, ApplicationEvent('deafen, JNothing), _, ccid) ⇒ Deafen(target, ccid)
       case m ⇒ throw new InvalidMessageException(m)
     }
   }

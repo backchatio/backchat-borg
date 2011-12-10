@@ -71,4 +71,8 @@ message Service {
   required ServiceType provides = 5 [ default = DOMAIN];
 }
 
+message Subscription {
+  repeated bytes addresses = 1;
+}
+
 

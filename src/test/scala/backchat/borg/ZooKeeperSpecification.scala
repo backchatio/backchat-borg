@@ -1,9 +1,7 @@
 package backchat.borg
 
 import testing.ZooKeeperTestServer
-import akka.actor.Actor
-import org.specs2.Specification
-import com.twitter.zookeeper.{ ZooKeeperClient, ZooKeeperClientConfig }
+import com.twitter.zookeeper.{ ZooKeeperClientConfig }
 import org.specs2.specification.{ Step, After, Fragments }
 import mojolly.testing.{ MojollySpecification, AkkaSpecification }
 

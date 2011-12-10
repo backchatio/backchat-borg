@@ -84,14 +84,14 @@ class ClientSpec extends MojollySpecification { def is =
     def handlesShout = this {
       withServer() { server => 
         withClient(server.address) { client => 
-          val appEvt = ApplicationEvent('pingping, JArray(JString("the message") :: Nil)).toJValue
+          val appEvt = ApplicationEvent('pingping, JArray(JString("the message") :: Nil))
           val latch = new StandardLatch()
           
           server onMessage { (frames: Seq[Frame]) =>
             val msg = zmqMessage(frames)
             println("Received: %s" format msg)
             msg match {
-              case BorgMessage(MessageType.PubSub, "target", ApplicationEvent('publish, `appEvt`), Some("publish"), _) => {
+              case BorgMessage(MessageType.PubSub, "target", `appEvt`, Some("publish"), _) => {
                 latch.open()
               }
               case _ =>
