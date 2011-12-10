@@ -136,7 +136,7 @@ trait ZeroMqContext extends Around with TestKit {
     res
   }
 
-  def withClient[T](address: TelepathAddress, subscriptionManager: Option[ActorRef] = None)(fn: ActorRef ⇒ T)(implicit evidence$1: (T) ⇒ Result): T = {
+  def withClient[T](address: TelepathAddress, subscriptionManager: Option[ActorRef] = None)(fn: TestActorRef[Client] ⇒ T)(implicit evidence$1: (T) ⇒ Result): T = {
     val client = TestActorRef(new Client(TelepathClientConfig(address, subscriptionManager = subscriptionManager))).start()
     val res = fn(client)
     client.stop()

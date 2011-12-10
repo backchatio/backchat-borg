@@ -5,16 +5,41 @@ package telepathy
 import akka.actor._
 import Actor._
 import akka.zeromq._
-import akka.dispatch.CompletableFuture
 import telepathy.Messages._
 import telepathy.Subscriptions.Do
+import akka.dispatch.{ Future, CompletableFuture }
+import mojolly.Delay
 
 case class TelepathClientConfig(server: TelepathAddress, listener: Option[ActorRef] = None, subscriptionManager: Option[ActorRef] = None)
+case class ExpectedHug(
+    sender: ActorRef,
+    count: Int, timeout: Duration,
+    private var timeoutHandlers: Vector[() ⇒ Any] = Vector.empty) {
+
+  private val delay = Delay(timeout)(handleTimeout)
+  delay.start
+
+  private def handleTimeout = {
+    timeoutHandlers foreach (_.apply())
+    timeoutHandlers = Vector.empty
+  }
+
+  def onTimeout(handler: ⇒ Any) = { timeoutHandlers :+= (() ⇒ handler); this }
+
+  def incrementCount =
+    copy(count = count + 1, timeoutHandlers = timeoutHandlers)
+
+  def gotIt = {
+    delay.stop
+    timeoutHandlers = Vector.empty
+  }
+}
 
 class Client(config: TelepathClientConfig) extends Telepath {
 
   lazy val socket = newSocket(SocketType.Dealer, Linger(0L))
   var activeRequests = Map.empty[Uuid, CompletableFuture[Any]]
+  var expectedHugs = Map.empty[Uuid, ExpectedHug]
 
   val subscriptionManager = config.subscriptionManager getOrElse spawnSubscriptionManager
 
@@ -32,6 +57,7 @@ class Client(config: TelepathClientConfig) extends Telepath {
       logger trace "Establishing connection to server"
     }
     case Paranoid ⇒ {
+      println("becoming paranoid")
       become(paranoid)
       // TODO: start pinging
     }
@@ -51,18 +77,18 @@ class Client(config: TelepathClientConfig) extends Telepath {
   protected def paranoid: Receive = manageLifeCycle orElse { // TODO: Actually provide the reliabillity
     case m: Tell ⇒ {
       logger trace "enqueuing a message to a server: %s".format(m)
-      sendToSocket(m)
+      sendToSocketAndExpectHug(m)
     }
     case m: Ask ⇒ {
       logger trace "Sending a request to a server: %s".format(m)
       self.senderFuture foreach { fut ⇒
         activeRequests += m.ccid -> fut
-        sendToSocket(m)
+        sendToSocketAndExpectHug(m)
       }
     }
     case m: Shout ⇒ {
       logger trace "Sending publish to a server: %s".format(m)
-      sendToSocket(m)
+      sendToSocketAndExpectHug(m)
     }
     case m: Listen ⇒ {
       logger trace "Sending subscribe to a server: %s".format(m)
@@ -72,7 +98,7 @@ class Client(config: TelepathClientConfig) extends Telepath {
       logger trace "Sending unsubscribe to a server: %s".format(m)
       subscriptionManager ! (m, self.sender.get)
     }
-    case Do(req) ⇒ sendToSocket(req) // subscription manager callbacks
+    case Do(req) ⇒ sendToSocketAndExpectHug(req) // subscription manager callbacks
     case m: ZMQMessage ⇒ deserialize(m) match { // incoming message handler
       case rep: Reply ⇒ {
         logger trace "processing a reply: %s".format(rep)
@@ -82,10 +108,24 @@ class Client(config: TelepathClientConfig) extends Telepath {
         logger trace "processing publish to local subscriptions: %s".format(shout)
         subscriptionManager ! shout
       }
+      case Hug(ccid) ⇒ {
+        println("received a hug %s" format Hug(ccid))
+        expectedHugs(ccid).gotIt
+        expectedHugs -= ccid
+      }
       case Pong ⇒ { //TODO: Handle Pong
 
       }
     }
+  }
+
+  protected def sendToSocketAndExpectHug(m: HiveRequest) = {
+    expectedHugs += m.ccid -> {
+      ExpectedHug(self.sender.get, 1, 1.second) onTimeout {
+        expectedHugs += m.ccid -> expectedHugs(m.ccid).incrementCount
+      }
+    }
+    sendToSocket(m)
   }
 
   protected def sendToSocket(m: HiveRequest) = {

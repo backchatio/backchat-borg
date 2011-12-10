@@ -8,12 +8,12 @@ import net.liftweb.json.JsonAST.{JArray, JString}
 import java.util.concurrent.TimeUnit
 import akka.zeromq.Frame
 import BorgMessage.MessageType
-import telepathy.Messages._
 import akka.actor._
-import org.multiverse.api.latches.StandardLatch
 import net.liftweb.json._
 import mojolly.testing.{AkkaSpecification}
 import akka.testkit.TestActorRef
+import telepathy.Messages._
+import org.multiverse.api.latches.StandardLatch
 
 class ClientSpec extends AkkaSpecification { def is =
   "A telepathic client should" ^
@@ -193,7 +193,26 @@ class ClientSpec extends AkkaSpecification { def is =
       }
     }
     
-    def expectsHugForTell = pending
+    def expectsHugForTell = this {
+      withServer() { server => 
+        withClient(server.address) { client =>
+          client ! Paranoid
+          server onMessage { (frames: Seq[Frame]) => 
+            zmqMessage(frames) match {
+              case BorgMessage(MessageType.FireForget, _, _, _, ccid) => {
+                server.socket.send(frames.head.payload.toArray, ZMQ.SNDMORE)
+                server.socket.send(Hug(ccid).toBytes, 0)
+              }
+            }
+          }
+          val msg = Tell("target", ApplicationEvent('pingping))
+          client ! msg
+          val r1 = client.underlyingActor.expectedHugs.get(msg.ccid) must beSome[ExpectedHug].eventually
+          server poll 2.seconds
+          r1 and (client.underlyingActor.expectedHugs.get(msg.ccid) must beNone.eventually)
+        }
+      }
+    }
     
     def expectsHugForAsk = pending
     

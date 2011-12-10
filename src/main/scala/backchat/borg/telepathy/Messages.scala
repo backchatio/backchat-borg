@@ -15,6 +15,7 @@ object Messages extends Logging {
   sealed trait HiveMessage extends BorgMessageWrapper
   sealed trait HiveRequest extends HiveMessage {
     def target: String
+    def ccid: Uuid
   }
   sealed trait HiveControlRequest extends HiveMessage
 
@@ -52,13 +53,14 @@ object Messages extends Logging {
   sealed trait HiveResponse extends HiveMessage
   sealed trait HiveControlResponse extends HiveMessage
 
-  sealed abstract class ControlResponse(val name: Symbol) extends HiveControlResponse {
-    val unwrapped = BorgMessage(MessageType.System, "", ApplicationEvent(name))
+  sealed abstract class ControlResponse(val name: Symbol, val ccid: Uuid = newUuid) extends HiveControlResponse {
+    val unwrapped = BorgMessage(MessageType.System, "", ApplicationEvent(name), ccid = ccid)
   }
   case object Pong extends ControlResponse('pong)
   case class Reply(target: String, payload: ApplicationEvent, ccid: Uuid = newUuid()) extends HiveResponse {
     def unwrapped = BorgMessage(MessageType.RequestReply, target, payload, ccid = ccid)
   }
+  case class Hug(override val ccid: Uuid) extends ControlResponse('hug, ccid)
 
   sealed trait InternalMessage
   case object Init extends InternalMessage
@@ -82,6 +84,7 @@ object Messages extends Logging {
       case BorgMessage(MessageType.PubSub, target, ApplicationEvent('listen, JNothing), _, ccid) ⇒ Listen(target, ccid)
       case BorgMessage(MessageType.PubSub, target, ApplicationEvent('deafen, JNothing), _, null) ⇒ Deafen(target)
       case BorgMessage(MessageType.PubSub, target, ApplicationEvent('deafen, JNothing), _, ccid) ⇒ Deafen(target, ccid)
+      case BorgMessage(MessageType.System, _, ApplicationEvent('hug, _), _, ccid) ⇒ Hug(ccid)
       case m ⇒ throw new InvalidMessageException(m)
     }
   }
