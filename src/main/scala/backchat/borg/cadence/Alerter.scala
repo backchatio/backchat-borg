@@ -29,18 +29,18 @@ class Alerter(config: AlerterContext) extends Bootable with Logging {
     httpClient.close()
   }
 
-  def requestUrl = "%s/render?format=json&from=-%ds" format (config.url, config.period)
+  def requestUrl(window: Duration) = "%s/render?format=json&from=-%ds" format (config.url, window.seconds)
 
   def run {
-    val req = (httpClient prepareGet requestUrl)
-    config.alerts foreach { a ⇒
-      req addQueryParameter ("target", a.target)
+    config.alerts foreach { alert ⇒
+      val req = (httpClient prepareGet requestUrl(alert.window))
+      req addQueryParameter ("target", alert.target)
+      val resp = req execute () get ()
+      logger debug ("polling " + resp.getUri)
+      val json = resp.getResponseBody
+      logger debug ("response:" + json)
+      GraphiteResponse(json) foreach handle
     }
-    val resp = req execute () get ()
-    logger debug ("polling " + resp.getUri)
-    val json = resp.getResponseBody
-    logger debug ("response:" + json)
-    GraphiteResponse(json) foreach handle
   }
 
   def warn(a: Alert, m: Metric) = alertLogger warn ("warn threshold for %s passed" format a.target)
@@ -71,22 +71,21 @@ object Alerter {
     val applicationName = "Alerter"
     val alerter = AlerterContext(
       "http://%s" format (reporting map (_.host) getOrElse "graphite"),
-      config.getSection("mojolly.reporting") flatMap { sect ⇒
-        sect.getInt("pollInterval")
-      },
+      config.getSection("mojolly.reporting") flatMap (_.getInt("pollInterval")),
       config.getSection("mojolly.borg.cadence.alerts") map { section ⇒
-        section.keys.map(_.split("\\.", 2)).map(_.head) map { k ⇒
+        section.keys map { k ⇒
+          val key = k.split("\\.", 2).head
           Alert(
-            section.getString(k + ".graphitekeypattern").get,
-            section.getDouble(k + ".error").get,
-            section.getDouble(k + ".warn").get)
+            section.getString(key + ".graphitekeypattern").get,
+            section.getDouble(key + ".error").get,
+            section.getDouble(key + ".warn").get)
         }
       } getOrElse Nil
     )
   }
 
   case class AlerterContext(url: String, period: Int, alerts: Seq[Alert])
-  case class Alert(target: String, warn: Double, error: Double)
+  case class Alert(target: String, warn: Double, error: Double, window: Duration = 5.minutes)
 
   case class GraphiteResponse(metrics: List[Metric])
   case class Metric(target: String, datapoints: List[Datapoint])

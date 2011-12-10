@@ -12,7 +12,7 @@ package object telepathy {
   private val supervisor =
     Supervisor(SupervisorConfig(OneForOneStrategy(classOf[Throwable] :: Nil, 5, 3000), Nil))
 
-  def newTelepathicClient(server: String): ActorRef = {
+  def newTelepathicClient(server: String, supervisor: { def link(actor: ActorRef)} = supervisor): ActorRef = {
     val addr = TelepathAddress(server)
     val client = actorOf(new Client(TelepathClientConfig(addr)))
     supervisor link client

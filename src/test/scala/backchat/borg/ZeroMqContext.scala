@@ -3,7 +3,6 @@ package backchat.borg
 import org.zeromq.ZMQ
 import mojolly.io.FreePort
 import org.zeromq.ZMQ.{ Poller, Context, Socket }
-import mojolly.testing.MojollySpecification
 import org.specs2.specification.Around
 import telepathy._
 import util.DynamicVariable
