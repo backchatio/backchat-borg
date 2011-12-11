@@ -256,17 +256,8 @@ class ClientSpec extends AkkaSpecification { def is =
         withClient(server.address) { client =>
           val topic = "the-topic"
           client ! Paranoid
-          client ? Ask(topic, ApplicationEvent('pingping))
-
-          var msg: RescheduleRequest = null
-          val expires = 6.seconds.from(DateTime.now)
-          while (msg == null && expires >= DateTime.now) {
-            receiveOne(0.seconds) match {
-              case m: RescheduleRequest => msg = m
-              case _ =>
-            }
-          }
-          msg must not beNull
+          val res = (client.ask(Ask(topic, ApplicationEvent('pingping)), 7.seconds.millis)).get
+          res must beAnInstanceOf[RescheduleRequest]
         }
       }
     }
@@ -299,7 +290,7 @@ class ClientSpec extends AkkaSpecification { def is =
           client ! Listen(topic)
 
           var msg: RescheduleRequest = null
-          val expires = 6.seconds.from(DateTime.now)
+          val expires = 7.seconds.from(DateTime.now)
           while (msg == null && expires >= DateTime.now) {
             receiveOne(0.seconds) match {
               case m: RescheduleRequest => msg = m
@@ -319,7 +310,7 @@ class ClientSpec extends AkkaSpecification { def is =
           client ! Deafen(topic)
 
           var msg: RescheduleRequest = null
-          val expires = 6.seconds.from(DateTime.now)
+          val expires = 7.seconds.from(DateTime.now)
           while (msg == null && expires >= DateTime.now) {
             receiveOne(0.seconds) match {
               case m: RescheduleRequest => msg = m

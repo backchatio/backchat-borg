@@ -123,6 +123,7 @@ class Client(config: TelepathClientConfig) extends Telepath {
       if (hug.count >= 5) {
         println("retrying")
         expectedHugs += m.ccid -> hug.incrementCount(hugFuture(m))
+        sendToSocket(m)
       } else {
         println("rescheduling")
         hug.sender match {
