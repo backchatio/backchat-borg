@@ -131,7 +131,9 @@ class Client(config: TelepathClientConfig) extends Telepath {
             hug.sender match {
               case f: ActorCompletableFuture ⇒ f.complete(Right(RescheduleRequest(m)))
               case f: ActorRef               ⇒ f ! RescheduleRequest(m)
+              case _                         ⇒
             }
+            expectedHugs -= m.ccid
           }
         }
       }

@@ -230,7 +230,23 @@ class ClientSpec extends AkkaSpecification { def is =
     
     def expectsHugForDeafen = expectsHugFor(Deafen("topic"))
     
-    def handlesNoHugsForTell = pending
+    def handlesNoHugsForTell = this {
+      withServer() { server =>
+        withClient(server.address) { client =>
+          val topic = "the-topic"
+          val latch = new StandardLatch()
+          server onMessage { (frames: Seq[Frame]) =>
+            zmqMessage(frames) match {
+              case BorgMessage(MessageType.PubSub, `topic`, ApplicationEvent('listen, JNothing), _, _) =>
+                latch.open
+              case _ =>
+            }
+          }
+          client ! Listen(topic)
+          receiveWhile(6.seconds)  must beAnInstanceOf[RescheduleRequest]
+        }
+      }
+    }
     
     def handlesNoHugsForAsk = pending
     
