@@ -61,6 +61,7 @@ class ClientSpec extends AkkaSpecification { def is =
         }
       }
     }
+
     
     def handlesRequest = this {
       withServer() { server =>
@@ -85,7 +86,7 @@ class ClientSpec extends AkkaSpecification { def is =
     }
     
     def handlesShout = this {
-      withServer() { server => 
+      withServer() { server =>
         withClient(server.address) { client => 
           val appEvt = ApplicationEvent('pingping, JArray(JString("the message") :: Nil))
           val latch = new StandardLatch()
@@ -108,7 +109,7 @@ class ClientSpec extends AkkaSpecification { def is =
     }
     
     def handlesListen = this {
-      withServer() { server => 
+      withServer() { server =>
         val subscriptionmanager = Actor.actorOf[Subscriptions.LocalSubscriptions].start()
         withClient(server.address, Some(subscriptionmanager)) { client =>
           val topic = "the-topic"
@@ -128,7 +129,7 @@ class ClientSpec extends AkkaSpecification { def is =
     }
 
     def addsSubscriptionToManager = this {
-      withServer() { server => 
+      withServer() { server =>
         val subscriptionManager = TestActorRef[Subscriptions.LocalSubscriptions].start()
         withClient(server.address, subscriptionManager = Some(subscriptionManager)) { client =>
           val topic = "the-topic"
@@ -196,7 +197,6 @@ class ClientSpec extends AkkaSpecification { def is =
     private def expectsHugFor(msg: HiveRequest) = this {
       withServer() { server => 
         withClient(server.address) { client =>
-          client ! Paranoid
           val l1 = TestLatch()
           server onMessage { (frames: Seq[Frame]) => 
             Messages(zmqMessage(frames)) match {
@@ -207,6 +207,7 @@ class ClientSpec extends AkkaSpecification { def is =
               case CanHazHugz => l1.countDown()
             }
           }
+          client ! Paranoid
           server poll 2.seconds
           l1 await 10.millis
           msg match {
@@ -234,27 +235,101 @@ class ClientSpec extends AkkaSpecification { def is =
       withServer() { server =>
         withClient(server.address) { client =>
           val topic = "the-topic"
-          val latch = new StandardLatch()
-          server onMessage { (frames: Seq[Frame]) =>
-            zmqMessage(frames) match {
-              case BorgMessage(MessageType.PubSub, `topic`, ApplicationEvent('listen, JNothing), _, _) =>
-                latch.open
+          client ! Paranoid
+          client ! Tell(topic, ApplicationEvent('pingping))
+
+          var msg: RescheduleRequest = null
+          val expires = 6.seconds.from(DateTime.now)
+          while (msg == null && expires >= DateTime.now) {
+            receiveOne(0.seconds) match {
+              case m: RescheduleRequest => msg = m
               case _ =>
             }
           }
-          client ! Listen(topic)
-          receiveWhile(6.seconds)  must beAnInstanceOf[RescheduleRequest]
+          msg must not beNull
         }
       }
     }
     
-    def handlesNoHugsForAsk = pending
+    def handlesNoHugsForAsk =  this {
+      withServer() { server =>
+        withClient(server.address) { client =>
+          val topic = "the-topic"
+          client ! Paranoid
+          client ? Ask(topic, ApplicationEvent('pingping))
+
+          var msg: RescheduleRequest = null
+          val expires = 6.seconds.from(DateTime.now)
+          while (msg == null && expires >= DateTime.now) {
+            receiveOne(0.seconds) match {
+              case m: RescheduleRequest => msg = m
+              case _ =>
+            }
+          }
+          msg must not beNull
+        }
+      }
+    }
     
-    def handlesNoHugsForShout = pending
+    def handlesNoHugsForShout =  this {
+      withServer() { server =>
+        withClient(server.address) { client =>
+          val topic = "the-topic"
+          client ! Paranoid
+          client ! Shout(topic, ApplicationEvent('pingping))
+
+          var msg: RescheduleRequest = null
+          val expires = 6.seconds.from(DateTime.now)
+          while (msg == null && expires >= DateTime.now) {
+            receiveOne(0.seconds) match {
+              case m: RescheduleRequest => msg = m
+              case _ =>
+            }
+          }
+          msg must not beNull
+        }
+      }
+    }
     
-    def handlesNoHugsForListen = pending
+    def handlesNoHugsForListen =  this {
+      withServer() { server =>
+        withClient(server.address) { client =>
+          val topic = "the-topic"
+          client ! Paranoid
+          client ! Listen(topic)
+
+          var msg: RescheduleRequest = null
+          val expires = 6.seconds.from(DateTime.now)
+          while (msg == null && expires >= DateTime.now) {
+            receiveOne(0.seconds) match {
+              case m: RescheduleRequest => msg = m
+              case _ =>
+            }
+          }
+          msg must not beNull
+        }
+      }
+    }
     
-    def handlesNoHugsForDeafen = pending
+    def handlesNoHugsForDeafen =  this {
+      withServer() { server =>
+        withClient(server.address) { client =>
+          val topic = "the-topic"
+          client ! Paranoid
+          client ! Deafen(topic)
+
+          var msg: RescheduleRequest = null
+          val expires = 6.seconds.from(DateTime.now)
+          while (msg == null && expires >= DateTime.now) {
+            receiveOne(0.seconds) match {
+              case m: RescheduleRequest => msg = m
+              case _ =>
+            }
+          }
+          msg must not beNull
+        }
+      }
+    }
 
     def sendsPings = pending
   }

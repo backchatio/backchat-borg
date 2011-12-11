@@ -7,32 +7,21 @@ import Actor._
 import akka.zeromq._
 import telepathy.Messages._
 import telepathy.Subscriptions.Do
-import mojolly.Delay
-import akka.dispatch.{ ActorCompletableFuture, Future, CompletableFuture }
+import akka.dispatch.{ DefaultCompletableFuture, ActorCompletableFuture, Future, CompletableFuture }
 
 case class TelepathClientConfig(server: TelepathAddress, listener: Option[ActorRef] = None, subscriptionManager: Option[ActorRef] = None)
 case class ExpectedHug(
     sender: UntypedChannel,
-    count: Int, timeout: Duration,
-    private var timeoutHandlers: Vector[() ⇒ Any] = Vector.empty) {
+    count: Int,
+    future: DefaultCompletableFuture[Any]) {
 
-  private val delay = Delay(timeout)(handleTimeout)
-  delay.start
-
-  private def handleTimeout = {
-    timeoutHandlers foreach (_.apply())
-    timeoutHandlers = Vector.empty
-  }
-
-  def onTimeout(handler: ⇒ Any) = { timeoutHandlers :+= (() ⇒ handler); this }
-
-  def incrementCount =
-    copy(count = count + 1, timeoutHandlers = timeoutHandlers)
+  def incrementCount(newFuture: DefaultCompletableFuture[Any]) =
+    copy(count = count + 1, future = newFuture)
 
   def gotIt = {
-    delay.stop
-    timeoutHandlers = Vector.empty
+    future.completeWithResult(null)
   }
+
 }
 
 class Client(config: TelepathClientConfig) extends Telepath {
@@ -49,7 +38,7 @@ class Client(config: TelepathClientConfig) extends Telepath {
     self ! Init
   }
 
-  protected def receive = happyGoLucky
+  protected def receive = manageLifeCycle orElse happyGoLucky
 
   protected def manageLifeCycle: Receive = {
     case Init ⇒ {
@@ -57,14 +46,13 @@ class Client(config: TelepathClientConfig) extends Telepath {
       logger trace "Establishing connection to server"
     }
     case Paranoid ⇒ {
-      println("becoming paranoid")
-      become(paranoid)
+      become(manageLifeCycle orElse paranoid)
       sendToSocket(CanHazHugz)
       // TODO: start pinging
     }
     case HappyGoLucky ⇒ {
       // TODO: check if pings are active and disable those
-      become(happyGoLucky)
+      become(manageLifeCycle orElse happyGoLucky)
     }
     case Connecting ⇒ {
       logger info "Connected to server"
@@ -75,7 +63,7 @@ class Client(config: TelepathClientConfig) extends Telepath {
     }
   }
 
-  protected def paranoid: Receive = manageLifeCycle orElse { // TODO: Actually provide the reliabillity
+  protected def paranoid: Receive = {
     case m: Tell ⇒ {
       logger trace "enqueuing a message to a server: %s".format(m)
       sendToSocketAndExpectHug(m)
@@ -122,30 +110,36 @@ class Client(config: TelepathClientConfig) extends Telepath {
   }
 
   protected def sendToSocketAndExpectHug(m: HiveRequest) = {
+    val fut = hugFuture(m)
     expectedHugs += m.ccid -> {
-      ExpectedHug(self.channel, 1, 1.second) onTimeout {
-        expectedHugs.get(m.ccid) foreach { hug ⇒
-          if (hug.count >= 5) {
-            expectedHugs += m.ccid -> hug.incrementCount
-          } else {
-            hug.sender match {
-              case f: ActorCompletableFuture ⇒ f.complete(Right(RescheduleRequest(m)))
-              case f: ActorRef               ⇒ f ! RescheduleRequest(m)
-              case _                         ⇒
-            }
-            expectedHugs -= m.ccid
-          }
-        }
-      }
+      ExpectedHug(self.channel, 1, fut)
     }
     sendToSocket(m)
+  }
+
+  protected def hugFuture(m: HiveRequest): DefaultCompletableFuture[Any] = Future.empty[Any](100).onTimeout(_ ⇒ rescheduleHug(m))
+  protected def rescheduleHug(m: HiveRequest) = {
+    expectedHugs.get(m.ccid) foreach { hug ⇒
+      if (hug.count >= 5) {
+        println("retrying")
+        expectedHugs += m.ccid -> hug.incrementCount(hugFuture(m))
+      } else {
+        println("rescheduling")
+        hug.sender match {
+          case f: ActorCompletableFuture ⇒ f.completeWithResult(RescheduleRequest(m)) //f.complete(Right(RescheduleRequest(m)))
+          case f: ActorRef               ⇒ f ! RescheduleRequest(m)
+          case _                         ⇒
+        }
+        expectedHugs -= m.ccid
+      }
+    }
   }
 
   protected def sendToSocket(m: BorgMessageWrapper) = {
     socket ! serialize(m)
   }
 
-  protected def happyGoLucky: Receive = manageLifeCycle orElse {
+  protected def happyGoLucky: Receive = {
     case m: Tell ⇒ {
       logger trace "enqueuing a message to a server: %s".format(m)
       sendToSocket(m)

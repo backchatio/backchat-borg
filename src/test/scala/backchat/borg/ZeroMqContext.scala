@@ -30,9 +30,9 @@ object TestTelepathyServer {
 
   case class Server(socket: Socket, address: TelepathAddress, poller: ZeroMQPoller, context: ZMQ.Context) {
     def stop = {
-      poller -= socket
+      if (poller.isNotNull) poller -= socket
       socket.close()
-      poller.dispose()
+      if (poller.isNotNull) poller.dispose()
     }
 
     def onMessage(fn: ZMessageHandler) = {
@@ -71,9 +71,9 @@ class ZeroMQPoller(context: Context) {
 
   def -=(socket: Socket) {
     val idx = sockets indexOf socket
-    poller unregister socket
+    if (poller != null) poller unregister socket
     sockets -= socket
-    pollinHandlers remove idx
+    if (idx >= 0) pollinHandlers remove idx
   }
 
   def +=(handler: (Socket, ZMessageHandler)) {
