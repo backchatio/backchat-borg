@@ -76,6 +76,7 @@ object Messages extends Logging {
     logger debug "Converting message: %s".format(msg)
     msg match {
       case BorgMessage(MessageType.System, _, ApplicationEvent('pong, _), _, _) ⇒ Pong
+      case BorgMessage(MessageType.System, _, ApplicationEvent('ping, _), _, _) ⇒ Ping
       case BorgMessage(MessageType.FireForget, target, data, _, null) ⇒ Tell(target, data)
       case BorgMessage(MessageType.FireForget, target, data, _, ccid) ⇒ Tell(target, data, ccid)
       case BorgMessage(MessageType.RequestReply, target, data, Some(sender), null) ⇒ Ask(target, sender, data)

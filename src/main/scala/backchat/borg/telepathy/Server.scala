@@ -2,9 +2,55 @@ package backchat
 package borg
 package telepathy
 
-class Server extends Telepath {
-  
-  protected def receive = {
-    case _ =>
+import Messages._
+import akka.actor.ActorRef
+import akka.zeromq._
+import akka.dispatch.{ Future }
+
+case class ServerConfig(listenOn: TelepathAddress, socket: Option[ActorRef] = None)
+
+object Server {
+  type Respond = PartialFunction[BorgMessageWrapper, Future[BorgMessageWrapper]]
+}
+class Server(config: ServerConfig) extends Telepath {
+
+  import Server._
+  lazy val socket = config.socket getOrElse newSocket(SocketType.Router, Linger(0L))
+
+  self.id = config.listenOn.address
+
+  override def preStart() {
+    self ! Init
+  }
+
+  protected def receive = connectionManagement
+  private var currentZMessage: Array[Byte] = Array.empty
+
+  protected def connectionManagement: Receive = {
+    case Init ⇒ {
+      socket ! Bind(self.id)
+      logger info "Server %s is ready".format(self.id)
+    }
+    case request: ZMQMessage if responseFor.isDefinedAt(deserialize(request)) ⇒ {
+      val resp = responseFor(deserialize(request))
+      resp onResult {
+        case response ⇒ {
+          val repl = replyFor(request, response)
+          println("replying with: %s" format repl)
+          socket ! repl
+        }
+      }
+    }
+  }
+
+  protected def responseFor: Respond = {
+    case Ping ⇒ Future { Pong }
+  }
+
+  val serializer = new BorgZMQMessageSerializer
+  private def deserialize(msg: ZMQMessage) = Messages(serializer.fromZMQMessage(msg))
+  private def serialize(msg: BorgMessageWrapper) = Frame(msg.toBytes)
+  private def replyFor(request: ZMQMessage, response: BorgMessageWrapper) = {
+    Send(request.frames.dropRight(1) :+ serialize(response))
   }
 }

@@ -54,10 +54,8 @@ class Client(config: TelepathClientConfig) extends Telepath {
     case Paranoid ⇒ {
       become(brainDead orElse paranoid)
       sendToSocket(CanHazHugz)
-      // TODO: start pinging
     }
     case HappyGoLucky ⇒ {
-      // TODO: check if pings are active and disable those
       become(brainDead orElse happyGoLucky)
     }
     case Connecting ⇒ {
