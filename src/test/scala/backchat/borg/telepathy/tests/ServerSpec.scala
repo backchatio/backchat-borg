@@ -17,7 +17,7 @@ class ServerSpec extends AkkaSpecification { def is =
   "A Server should" ^
     "respond with pong when receiving a ping" ! specify.respondsWithPong ^
     "tracks active pubsub client sessions" ! pending ^ // on first subscription
-    "tracks active reliable client sessions" ! pending ^ bt ^ // CanHazHugz
+    "tracks active reliable client sessions" ! specify.tracksReliableClientSessions ^ bt ^ // CanHazHugz
     "when receiving a tell message" ^
       controlMessages(null) ^ bt  ^
     "when receiving an ask message" ^
@@ -55,7 +55,7 @@ class ServerSpec extends AkkaSpecification { def is =
     val port = FreePort.randomFreePort()
     val address = TelepathAddress("127.0.0.1", port)
     val addressUri = address.address
-    lazy val serverConfig = ServerConfig(address, Some(testActor))
+    lazy val serverConfig = ServerConfig(address, testActor.some)
     
     
     def respondsWithPong = {
@@ -68,8 +68,18 @@ class ServerSpec extends AkkaSpecification { def is =
         }
       }).start()
       val server = TestActorRef(new Server(serverConfig.copy(socket = socket.some))).start()
-      server ! ZMQMessage(Seq(Frame(clientId), Frame(Ping.toBytes)))
-      latch.await(2 seconds) must beTrue //and (receiveOne(2 seconds) must_== Send(Seq(Frame(clientId), Frame(Pong.toBytes))))
+      server ! mkMessage(Ping)
+      latch.await(2 seconds) must beTrue 
+    }
+    
+    def tracksReliableClientSessions = {
+      val server = TestActorRef(new Server(serverConfig)).start()
+      server ! mkMessage(CanHazHugz)
+      server.underlyingActor.activeClients must be_==(Vector(ClientSession(clientId))).eventually
+    }
+
+    def mkMessage(msg: BorgMessageWrapper) = {
+      ZMQMessage(Seq(Frame(clientId), Frame(msg.toBytes)))
     }
   }
 }

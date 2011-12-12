@@ -22,6 +22,7 @@ object Messages extends Logging {
 
   sealed abstract class ControlRequest(val name: Symbol) extends HiveControlRequest {
     val unwrapped = BorgMessage(BorgMessage.MessageType.System, "", ApplicationEvent(name))
+    def ccid = unwrapped.ccid
   }
   case object Ping extends ControlRequest('ping)
   case object CanHazHugz extends ControlRequest('can_haz_hugz)
