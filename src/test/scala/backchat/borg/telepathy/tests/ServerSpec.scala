@@ -22,23 +22,19 @@ class ServerSpec extends AkkaSpecification { def is =
     "tracks active pubsub client sessions" ! pending ^ // on first subscription
     "tracks active reliable client sessions" ! specify.tracksReliableClientSessions ^ bt ^ // CanHazHugz
     "when receiving a tell message" ^
-      controlMessages(tellSpec) ^ bt ^ end
-    /*"when receiving an ask message" ^
-      "reply with the response" ! pending ^
-      controlMessages(null) ^ bt  ^
-    "when receiving a shout message" ^
+      "route to the correct handler" ! tellSpec.routesToCorrectHandler ^
+      controlMessages(tellSpec) ^ bt ^
+    "when receiving an ask message" ^
+      "reply with the response" ! askSpec.sendsReply ^ end
+    /*"when receiving a shout message" ^
       "publish the message to the active subscriptions" ! pending ^
-      controlMessages(null) ^ bt  ^
     "when receiving a listen message" ^
       "add the listener to the active subscriptions" ! pending ^
-      controlMessages(null) ^ bt  ^
     "when receiving a deafen message" ^
       "remove the listener from the active subscriptions" ! pending ^
-      controlMessages(null) ^
   end*/
   
   def controlMessages(req: RequestContext) = {
-    "route to the correct handler" ! req.routesToCorrectHandler ^
     "do nothing for reliable false" ! req.doesNothingForUnreliable ^
     "send hug for reliable true" ! req.sendsHugForReliableClient
   }
@@ -68,10 +64,47 @@ class ServerSpec extends AkkaSpecification { def is =
 
   def specify = new ServerContext
   def tellSpec = new TellContext
+  def askSpec = new AskContext
+
+  class AskContext extends RequestContext {
+
+    def sendsReply = {
+      val socketLatch = new CountDownLatch(3)
+      val target = "the-reply-target"
+      val sender = "the-sender"
+      val req = Ask(target, sender, ApplicationEvent('pingping))
+      val hug = Hug(req.ccid)
+      val expected = mkMessage(Reply(sender, ApplicationEvent('pongpong), req.ccid)).frames
+      actorOf(new Actor {
+        self.id = target
+        protected def receive = {
+          case ApplicationEvent('pingping, JNothing) => self reply ApplicationEvent('pongpong)
+        }
+      }).start()
+      val socket = actorOf(new Actor {
+        def receive = {
+          case Bind(`addressUri`) => socketLatch.countDown
+          case `hug` => socketLatch.countDown
+          case Send(`expected`) => socketLatch.countDown
+        }
+      }).start()
+      val server = TestActorRef(new Server(serverConfig.copy(socket = socket.some))).start()
+      server ! mkMessage(CanHazHugz)
+      server ! mkMessage(req)
+      socketLatch.await(2, TimeUnit.SECONDS) must beTrue
+    }
+
+
+    def routesToCorrectHandler = pending
+
+    def doesNothingForUnreliable = pending
+
+    def sendsHugForReliableClient = pending
+  }
   
   class TellContext extends RequestContext {
     def routesToCorrectHandler = {
-      val l = TestLatch()
+      val l = new CountDownLatch(1)
       val target = "the-target"
       actorOf(new Actor {
         self.id = target
@@ -83,7 +116,7 @@ class ServerSpec extends AkkaSpecification { def is =
       val server = TestActorRef(new Server(serverConfig)).start()
       server ! mkMessage(CanHazHugz)
       server ! mkMessage(Tell(target, ApplicationEvent('pingping)))
-      l.await(2 seconds) must beTrue
+      l.await(2, TimeUnit.SECONDS) must beTrue
     }
 
     def doesNothingForUnreliable = {

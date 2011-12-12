@@ -60,6 +60,15 @@ class Server(config: ServerConfig) extends Telepath {
     case Ping           ⇒ Future { Pong }
     case a @ CanHazHugz ⇒ Future { 'addToClients }
     case m: Tell        ⇒ Future { registry.actorsFor(m.target).headOption foreach { _ ! m.payload } }
+    case m: Ask ⇒ Future {
+      registry.actorsFor(m.target).headOption map { r ⇒
+        try {
+          (r ? m.payload).as[ApplicationEvent] map { m respond _ } getOrElse (m error "No reply")
+        } catch {
+          case e ⇒ m error e.getMessage
+        }
+      } getOrElse m.serviceUnavailable
+    }
   }
 
   val serializer = new BorgZMQMessageSerializer

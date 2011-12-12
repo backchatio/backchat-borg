@@ -50,6 +50,8 @@ object Messages extends Logging {
   case class Ask(target: String, sender: String, payload: ApplicationEvent, ccid: Uuid = newUuid) extends HiveRequest {
     def unwrapped = BorgMessage(BorgMessage.MessageType.RequestReply, target, payload, Some(sender), ccid)
     def respond(payload: ApplicationEvent) = Reply(sender, payload, ccid = ccid)
+    def serviceUnavailable = ServiceUnavailable(sender, target, ccid)
+    def error(message: String) = Error(sender, message, ccid)
   }
 
   sealed trait HiveResponse extends HiveMessage
@@ -61,6 +63,12 @@ object Messages extends Logging {
   case object Pong extends ControlResponse('pong)
   case class Reply(target: String, payload: ApplicationEvent, ccid: Uuid = newUuid()) extends HiveResponse {
     def unwrapped = BorgMessage(MessageType.RequestReply, target, payload, ccid = ccid)
+  }
+  case class Error(target: String, message: String, ccid: Uuid) extends HiveResponse {
+    def unwrapped = BorgMessage(MessageType.RequestReply, target, ApplicationEvent('error, JString(message)), ccid = ccid)
+  }
+  case class ServiceUnavailable(target: String, service: String, ccid: Uuid) extends HiveResponse {
+    def unwrapped = BorgMessage(MessageType.RequestReply, target, ApplicationEvent('service_unavailable, JString(service)), ccid = ccid)
   }
   case class Hug(override val ccid: Uuid) extends ControlResponse('hug, ccid)
 
@@ -84,6 +92,8 @@ object Messages extends Logging {
       case BorgMessage(MessageType.RequestReply, target, data, Some(sender), ccid) ⇒ Ask(target, sender, data, ccid)
       case BorgMessage(MessageType.RequestReply, target, data, None, null) ⇒ Reply(target, data)
       case BorgMessage(MessageType.RequestReply, target, data, None, ccid) ⇒ Reply(target, data, ccid)
+      case BorgMessage(MessageType.RequestReply, target, ApplicationEvent('error, JString(data)), _, ccid) ⇒ Error(target, data, ccid)
+      case BorgMessage(MessageType.RequestReply, target, ApplicationEvent('service_unavailable, JString(data)), None, ccid) ⇒ ServiceUnavailable(target, data, ccid)
       case BorgMessage(MessageType.PubSub, target, data, Some("publish"), null) ⇒ Shout(target, data)
       case BorgMessage(MessageType.PubSub, target, data, Some("publish"), ccid) ⇒ Shout(target, data, ccid)
       case BorgMessage(MessageType.PubSub, target, ApplicationEvent('listen, JNothing), _, null) ⇒ Listen(target)
