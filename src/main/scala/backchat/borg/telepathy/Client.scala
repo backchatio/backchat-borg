@@ -8,8 +8,6 @@ import akka.zeromq._
 import telepathy.Messages._
 import telepathy.Subscriptions.Do
 import akka.dispatch.{ DefaultCompletableFuture, ActorCompletableFuture, Future, CompletableFuture }
-import scalaz._
-import Scalaz._
 
 case class TelepathClientConfig(
   server: TelepathAddress,
