@@ -67,7 +67,9 @@ object Messages extends Logging {
   case object Init extends InternalMessage
   case object HappyGoLucky extends InternalMessage
   case object Paranoid extends InternalMessage
-  case class RescheduleRequest(request: HiveRequest) extends InternalMessage
+  sealed trait Hugging extends InternalMessage
+  case class NoLovin(request: HiveRequest) extends Hugging
+  case object Hugged extends Hugging
 
   def apply(bytes: Seq[Byte]): BorgMessageWrapper = Messages(BorgMessage(bytes))
   def apply(msg: BorgMessage): BorgMessageWrapper = {

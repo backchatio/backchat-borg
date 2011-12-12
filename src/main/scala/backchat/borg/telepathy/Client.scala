@@ -8,18 +8,26 @@ import akka.zeromq._
 import telepathy.Messages._
 import telepathy.Subscriptions.Do
 import akka.dispatch.{ DefaultCompletableFuture, ActorCompletableFuture, Future, CompletableFuture }
+import scalaz._
+import Scalaz._
 
-case class TelepathClientConfig(server: TelepathAddress, listener: Option[ActorRef] = None, subscriptionManager: Option[ActorRef] = None)
+case class TelepathClientConfig(
+  server: TelepathAddress,
+  retries: Int = 3,
+  hugTimeout: Duration = 500.millis,
+  listener: Option[ActorRef] = None,
+  subscriptionManager: Option[ActorRef] = None)
+
 case class ExpectedHug(
     sender: UntypedChannel,
-    count: Int,
-    future: DefaultCompletableFuture[Any]) {
+    future: DefaultCompletableFuture[Hugging],
+    count: Int = 0) {
 
-  def incrementCount(newFuture: DefaultCompletableFuture[Any]) =
+  def incrementCount(newFuture: DefaultCompletableFuture[Hugging]) =
     copy(count = count + 1, future = newFuture)
 
   def gotIt = {
-    future.completeWithResult(null)
+    future.completeWithResult(Hugged)
   }
 
 }
@@ -38,21 +46,21 @@ class Client(config: TelepathClientConfig) extends Telepath {
     self ! Init
   }
 
-  protected def receive = manageLifeCycle orElse happyGoLucky
+  protected def receive = brainDead orElse happyGoLucky
 
-  protected def manageLifeCycle: Receive = {
+  protected def brainDead: Receive = {
     case Init ⇒ {
       socket ! Connect(config.server.address)
       logger trace "Establishing connection to server"
     }
     case Paranoid ⇒ {
-      become(manageLifeCycle orElse paranoid)
+      become(brainDead orElse paranoid)
       sendToSocket(CanHazHugz)
       // TODO: start pinging
     }
     case HappyGoLucky ⇒ {
       // TODO: check if pings are active and disable those
-      become(manageLifeCycle orElse happyGoLucky)
+      become(brainDead orElse happyGoLucky)
     }
     case Connecting ⇒ {
       logger info "Connected to server"
@@ -82,13 +90,13 @@ class Client(config: TelepathClientConfig) extends Telepath {
     }
     case m: Listen ⇒ {
       logger trace "Sending subscribe to a server: %s".format(m)
-      subscriptionManager ! (m, self.sender.get)
+      handleSubscription(m)
     }
     case m: Deafen ⇒ {
       logger trace "Sending unsubscribe to a server: %s".format(m)
-      subscriptionManager ! (m, self.sender.get)
+      handleSubscription(m)
     }
-    case Do(req) ⇒ sendToSocketAndExpectHug(req) // subscription manager callbacks
+    case Do(req) ⇒ // subscription manager callbacks
     case m: ZMQMessage ⇒ deserialize(m) match { // incoming message handler
       case rep: Reply ⇒ {
         logger trace "processing a reply: %s".format(rep)
@@ -109,26 +117,57 @@ class Client(config: TelepathClientConfig) extends Telepath {
     }
   }
 
-  protected def sendToSocketAndExpectHug(m: HiveRequest) = {
-    val fut = hugFuture(m)
+  protected def handleSubscription(m: HiveRequest) {
+    val ch = self.channel
+    sendToSocketAndExpectHug(m, { _ ⇒
+      m match {
+        case _: Listen | _: Deafen ⇒ subscriptionManager ! (m, ch)
+        case _                     ⇒
+      }
+    })
+  }
+
+  protected def sendToSocketAndExpectHug(m: HiveRequest, onComplete: Hugging ⇒ Unit = defaultOnComplete _) {
+    val fut = hugFuture(m, onComplete)
     expectedHugs += m.ccid -> {
-      ExpectedHug(self.channel, 1, fut)
+      ExpectedHug(self.channel, fut)
     }
     sendToSocket(m)
   }
 
-  protected def hugFuture(m: HiveRequest): DefaultCompletableFuture[Any] = Future.empty[Any](100).onTimeout(_ ⇒ rescheduleHug(m))
-  protected def rescheduleHug(m: HiveRequest) = {
+  protected def defaultOnComplete(res: Hugging) {}
+
+  protected def hugFuture(m: HiveRequest, onComplete: Hugging ⇒ Unit): DefaultCompletableFuture[Hugging] =
+    Future.empty[Hugging](config.hugTimeout.millis) onTimeout { _ ⇒ rescheduleHug(m, onComplete) } onResult {
+      case Hugged ⇒ {
+        onComplete(Hugged)
+        expectedHugs -= m.ccid
+      }
+      case nl @ NoLovin(_) ⇒ {
+        logger error ("Got no lovin' from the server, sad panda")
+        expectedHugs.get(m.ccid) foreach { hug ⇒
+          hug.sender match {
+            case f: ActorCompletableFuture ⇒ f.completeWithResult(nl) //f.complete(Right(NoLovin(m)))
+            case f: ActorRef               ⇒ f ! nl
+            case _                         ⇒
+          }
+        }
+        expectedHugs -= m.ccid
+      }
+    }
+
+  protected def rescheduleHug(m: HiveRequest, onComplete: Hugging ⇒ Unit) = {
     expectedHugs.get(m.ccid) foreach { hug ⇒
-      if (hug.count >= 5) {
-        println("retrying")
-        expectedHugs += m.ccid -> hug.incrementCount(hugFuture(m))
+      if (hug.count < config.retries) {
+        logger debug ("retrying request: %s" format m)
+        expectedHugs += m.ccid -> hug.incrementCount(hugFuture(m, onComplete))
         sendToSocket(m)
       } else {
-        println("rescheduling")
+        logger warn ("Got no lovin' from the server, sad panda")
+        val nl = NoLovin(m)
         hug.sender match {
-          case f: ActorCompletableFuture ⇒ f.completeWithResult(RescheduleRequest(m)) //f.complete(Right(RescheduleRequest(m)))
-          case f: ActorRef               ⇒ f ! RescheduleRequest(m)
+          case f: ActorCompletableFuture ⇒ f.completeWithResult(nl)
+          case f: ActorRef               ⇒ f ! nl
           case _                         ⇒
         }
         expectedHugs -= m.ccid

@@ -16,32 +16,37 @@ import org.multiverse.api.latches.StandardLatch
 import akka.testkit.{TestLatch, TestActorRef}
 
 class ClientSpec extends AkkaSpecification { def is =
-  "A telepathic client should" ^
-    "when responding to messages" ^
-      "handle an enqueue message" ! context.handlesEnqueue ^
-      "handle a request message" ! context.handlesRequest ^
-      "publish messages to a pubsub server" ! context.handlesShout ^
-      "subscribe to pubsub topics" ! context.handlesListen ^
-      "add the subscription to the subscription manager" ! context.addsSubscriptionToManager ^
-      "unsubscribe from pubsub topics" ! context.handlesDeafen ^
-      "remove subscription from the subscription manager" ! context.removesSubscriptionFromManager ^bt ^
-    "when providing reliability" ^
-      "expect a hug when the tell was received by the server" ! context.expectsHugForTell ^
-      "expect a hug when the ask was received by the server" ! context.expectsHugForAsk ^
-      "expect a hug when the shout message was received by the server" ! context.expectsHugForShout ^
-      "expect a hug when the listen message was received by the server" ! context.expectsHugForListen ^
-      "expect a hug when the deafen message was received by the server" ! context.expectsHugForDeafen ^
-      "reschedule a tell message when no hug received within the time limt" ! context.handlesNoHugsForTell ^
-      "reschedule an ask message when no hug received within the time limt" ! context.handlesNoHugsForAsk ^
-      "reschedule a shout message when no hug received within the time limt" ! context.handlesNoHugsForShout ^
-      "reschedule a listen message when no hug received within the time limt" ! context.handlesNoHugsForListen ^
-      "reschedule a deafen message when no hug received within the time limt" ! context.handlesNoHugsForDeafen ^
-      "send pings to the server if no activity for the specified period" ! context.sendsPings ^
+/*
+*/
+    "A telepathic client should" ^
+      "when responding to messages" ^
+        "handle an enqueue message" ! context.handlesEnqueue ^
+        "handle a request message" ! context.handlesRequest ^
+        "publish messages to a pubsub server" ! context.handlesShout ^
+        "subscribe to pubsub topics" ! context.handlesListen ^
+        "add the subscription to the subscription manager" ! context.addsSubscriptionToManager ^
+        "unsubscribe from pubsub topics" ! context.handlesDeafen ^
+        "remove subscription from the subscription manager" ! context.removesSubscriptionFromManager ^bt ^
+      "when providing reliability" ^
+        "expect a hug when the tell was received by the server" ! context.expectsHugForTell ^
+        "expect a hug when the ask was received by the server" ! context.expectsHugForAsk ^
+        "expect a hug when the shout message was received by the server" ! context.expectsHugForShout ^
+        "expect a hug when the listen message was received by the server" ! context.expectsHugForListen ^
+        "expect a hug when the deafen message was received by the server" ! context.expectsHugForDeafen ^
+        "reschedule a tell message when no hug received within the time limt" ! context.handlesNoHugsForTell ^
+        "reschedule an ask message when no hug received within the time limt" ! context.handlesNoHugsForAsk ^
+        "reschedule a shout message when no hug received within the time limt" ! context.handlesNoHugsForShout ^
+        "reschedule a listen message when no hug received within the time limt" ! context.handlesNoHugsForListen ^
+        "reschedule a deafen message when no hug received within the time limt" ! context.handlesNoHugsForDeafen ^
+        "send pings to the server if no activity for the specified period" ! context.sendsPings ^
     end
   
   def context = new ClientSpecContext
   
   class ClientSpecContext extends ZeroMqContext {
+
+    val subscriptions = TestActorRef[Subscriptions.LocalSubscriptions].start()
+
     def handlesEnqueue = this {
       withServer() { server =>
         withClient(server.address) { client =>
@@ -110,8 +115,7 @@ class ClientSpec extends AkkaSpecification { def is =
     
     def handlesListen = this {
       withServer() { server =>
-        val subscriptionmanager = Actor.actorOf[Subscriptions.LocalSubscriptions].start()
-        withClient(server.address, Some(subscriptionmanager)) { client =>
+        withClient(server.address, Some(subscriptions)) { client =>
           val topic = "the-topic"
           val latch = new StandardLatch()
           server onMessage { (frames: Seq[Frame]) =>
@@ -130,8 +134,7 @@ class ClientSpec extends AkkaSpecification { def is =
 
     def addsSubscriptionToManager = this {
       withServer() { server =>
-        val subscriptionManager = TestActorRef[Subscriptions.LocalSubscriptions].start()
-        withClient(server.address, subscriptionManager = Some(subscriptionManager)) { client =>
+        withClient(server.address, subscriptionManager = Some(subscriptions)) { client =>
           val topic = "the-topic"
           val latch = new StandardLatch()
           server onMessage { (frames: Seq[Frame]) =>
@@ -144,7 +147,7 @@ class ClientSpec extends AkkaSpecification { def is =
           client ! Listen(topic)
           server poll 2.seconds
           val res = latch.tryAwait(2, TimeUnit.SECONDS) must beTrue
-          val subs = subscriptionManager.underlyingActor.topicSubscriptions
+          val subs = subscriptions.underlyingActor.topicSubscriptions
           res and (subs must not beEmpty) and (subs(topic) must_== Set(testActor))
         }
       }
@@ -152,8 +155,7 @@ class ClientSpec extends AkkaSpecification { def is =
     
     def handlesDeafen = this {
       withServer() { server =>
-        val subscriptionmanager = Actor.actorOf[Subscriptions.LocalSubscriptions].start()
-        withClient(server.address, Some(subscriptionmanager)) { client =>
+        withClient(server.address, Some(subscriptions)) { client =>
           val topic = "the-topic"
           val latch = new StandardLatch()
           server onMessage { (frames: Seq[Frame]) =>
@@ -173,8 +175,7 @@ class ClientSpec extends AkkaSpecification { def is =
 
     def removesSubscriptionFromManager = this {
       withServer() { server =>
-        val subscriptionManager = TestActorRef[Subscriptions.LocalSubscriptions].start()
-        withClient(server.address, subscriptionManager = Some(subscriptionManager)) { client =>
+        withClient(server.address, subscriptionManager = Some(subscriptions)) { client =>
           val topic = "the-topic"
           val latch = new StandardLatch()
           server onMessage { (frames: Seq[Frame]) =>
@@ -188,7 +189,7 @@ class ClientSpec extends AkkaSpecification { def is =
           client ! Deafen(topic)
           2 times { server poll 2.seconds }
           val res = latch.tryAwait(2, TimeUnit.SECONDS) must beTrue
-          val subs = subscriptionManager.underlyingActor.topicSubscriptions
+          val subs = subscriptions.underlyingActor.topicSubscriptions
           res and (subs must beEmpty)
         }
       }
@@ -196,7 +197,7 @@ class ClientSpec extends AkkaSpecification { def is =
     
     private def expectsHugFor(msg: HiveRequest) = this {
       withServer() { server => 
-        withClient(server.address) { client =>
+        withClient(server.address, subscriptionManager = Some(subscriptions)) { client =>
           val l1 = TestLatch()
           server onMessage { (frames: Seq[Frame]) => 
             Messages(zmqMessage(frames)) match {
@@ -238,11 +239,11 @@ class ClientSpec extends AkkaSpecification { def is =
           client ! Paranoid
           client ! Tell(topic, ApplicationEvent('pingping))
 
-          var msg: RescheduleRequest = null
+          var msg: NoLovin = null
           val expires = 6.seconds.from(DateTime.now)
           while (msg == null && expires >= DateTime.now) {
             receiveOne(0.seconds) match {
-              case m: RescheduleRequest => msg = m
+              case m: NoLovin => msg = m
               case _ =>
             }
           }
@@ -257,7 +258,7 @@ class ClientSpec extends AkkaSpecification { def is =
           val topic = "the-topic"
           client ! Paranoid
           val res = (client.ask(Ask(topic, ApplicationEvent('pingping)), 7.seconds.millis)).get
-          res must beAnInstanceOf[RescheduleRequest]
+          res must beAnInstanceOf[NoLovin]
         }
       }
     }
@@ -269,11 +270,11 @@ class ClientSpec extends AkkaSpecification { def is =
           client ! Paranoid
           client ! Shout(topic, ApplicationEvent('pingping))
 
-          var msg: RescheduleRequest = null
+          var msg: NoLovin = null
           val expires = 6.seconds.from(DateTime.now)
           while (msg == null && expires >= DateTime.now) {
             receiveOne(0.seconds) match {
-              case m: RescheduleRequest => msg = m
+              case m: NoLovin => msg = m
               case _ =>
             }
           }
@@ -284,16 +285,16 @@ class ClientSpec extends AkkaSpecification { def is =
     
     def handlesNoHugsForListen =  this {
       withServer() { server =>
-        withClient(server.address) { client =>
+        withClient(server.address, subscriptionManager = Some(subscriptions)) { client =>
           val topic = "the-topic"
           client ! Paranoid
           client ! Listen(topic)
 
-          var msg: RescheduleRequest = null
+          var msg: NoLovin = null
           val expires = 7.seconds.from(DateTime.now)
           while (msg == null && expires >= DateTime.now) {
             receiveOne(0.seconds) match {
-              case m: RescheduleRequest => msg = m
+              case m: NoLovin => msg = m
               case _ =>
             }
           }
@@ -304,16 +305,16 @@ class ClientSpec extends AkkaSpecification { def is =
     
     def handlesNoHugsForDeafen =  this {
       withServer() { server =>
-        withClient(server.address) { client =>
+        withClient(server.address, subscriptionManager = Some(subscriptions)) { client =>
           val topic = "the-topic"
           client ! Paranoid
           client ! Deafen(topic)
 
-          var msg: RescheduleRequest = null
+          var msg: NoLovin = null
           val expires = 7.seconds.from(DateTime.now)
           while (msg == null && expires >= DateTime.now) {
             receiveOne(0.seconds) match {
-              case m: RescheduleRequest => msg = m
+              case m: NoLovin => msg = m
               case _ =>
             }
           }
