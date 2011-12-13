@@ -7,8 +7,13 @@ import akka.actor._
 import Actor._
 import akka.zeromq._
 import akka.dispatch.{ Future }
+import telepathy.Subscriptions.PublishTo
 
-case class ServerConfig(listenOn: TelepathAddress, socket: Option[ActorRef] = None)
+case class ServerConfig(
+  listenOn: TelepathAddress,
+  socket: Option[ActorRef] = None,
+  remoteSubscriptions: Option[ActorRef] = None,
+  localSubscriptions: Option[ActorRef] = None)
 object ClientSession {
   def apply(request: ZMQMessage): ClientSession = ClientSession(request.frames.head.payload)
 }
@@ -20,6 +25,8 @@ class Server(config: ServerConfig) extends Telepath {
 
   import Server._
   lazy val socket = config.socket getOrElse newSocket(SocketType.Router, Linger(0L))
+  lazy val remoteSubscriptions = config.remoteSubscriptions getOrElse newRemoteSubscriptions
+  lazy val localSubscriptions = config.localSubscriptions getOrElse newLocalSubscriptions
   var activeClients = Vector.empty[ClientSession]
 
   self.id = config.listenOn.address
@@ -35,12 +42,24 @@ class Server(config: ServerConfig) extends Telepath {
       socket ! Bind(self.id)
       logger info "Server %s is ready".format(self.id)
     }
-    case request: ZMQMessage if responseFor.isDefinedAt(deserialize(request)) ⇒
-      (deserialize _ andThen hugClientIfInNeed(request) andThen responseFor)(request) onResult {
+    case request: ZMQMessage if responseFor(request).isDefinedAt(deserialize(request)) ⇒
+      (deserialize _ andThen hugClientIfInNeed(request) andThen responseFor(request))(request) onResult {
         case response: BorgMessageWrapper ⇒ socket ! mkReply(request, response)
         case 'addToClients                ⇒ addToClients(ClientSession(request))
         case _                            ⇒ // ignore the other ones 
       }
+    case m: Listen ⇒ {
+      localSubscriptions ! (m, self.channel)
+    }
+    case m: Deafen ⇒ {
+      localSubscriptions ! (m, self.channel)
+    }
+    case m: Shout ⇒ {
+      Vector(remoteSubscriptions, localSubscriptions) foreach { _ ! m }
+    }
+    case PublishTo(subscription, topic, payload) ⇒ {
+      socket ! Send(subscription.addresses :+ serialize(Shout(topic, payload)))
+    }
   }
 
   protected def addToClients(session: ClientSession) = {
@@ -56,7 +75,7 @@ class Server(config: ServerConfig) extends Telepath {
     case m ⇒ m
   }
 
-  protected val responseFor: Respond = {
+  protected def responseFor(request: ZMQMessage): Respond = {
     case Ping           ⇒ Future { Pong }
     case a @ CanHazHugz ⇒ Future { 'addToClients }
     case m: Tell        ⇒ Future { registry.actorsFor(m.target).headOption foreach { _ ! m.payload } }
@@ -69,6 +88,17 @@ class Server(config: ServerConfig) extends Telepath {
         }
       } getOrElse m.serviceUnavailable
     }
+    case m: Listen ⇒ Future {
+      import Subscriptions.Subscription
+      remoteSubscriptions ! (m, Subscription(request.frames.dropRight(1)))
+    }
+    case m: Deafen ⇒ Future {
+      import Subscriptions.Subscription
+      remoteSubscriptions ! (m, Subscription(request.frames.dropRight(1)))
+    }
+    case m: Shout ⇒ Future {
+      Vector(remoteSubscriptions, localSubscriptions) foreach { _ ! m }
+    }
   }
 
   val serializer = new BorgZMQMessageSerializer
@@ -77,4 +107,22 @@ class Server(config: ServerConfig) extends Telepath {
   private def mkReply(request: ZMQMessage, response: BorgMessageWrapper) = {
     Send(request.frames.dropRight(1) :+ serialize(response))
   }
+
+  private def newRemoteSubscriptions = {
+    registry.actorFor[Subscriptions.RemoteSubscriptions] getOrElse {
+      val subs = actorOf[Subscriptions.RemoteSubscriptions]
+      realSupervisor startLink subs
+      subs
+    }
+  }
+
+  private def newLocalSubscriptions = {
+    registry.actorFor[Subscriptions.LocalSubscriptions] getOrElse {
+      val subs = actorOf[Subscriptions.LocalSubscriptions]
+      realSupervisor startLink subs
+      subs
+    }
+  }
+
+  private def realSupervisor: ActorRef = self.supervisor getOrElse self
 }

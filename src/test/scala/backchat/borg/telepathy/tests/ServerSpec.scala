@@ -22,21 +22,22 @@ class ServerSpec extends AkkaSpecification { def is =
     "tracks active pubsub client sessions" ! pending ^ // on first subscription
     "tracks active reliable client sessions" ! specify.tracksReliableClientSessions ^ bt ^ // CanHazHugz
     "when receiving a tell message" ^
-      "route to the correct handler" ! tellSpec.routesToCorrectHandler ^
-      controlMessages(tellSpec) ^ bt ^
+      "route to the correct handler" ! specify.routesToCorrectHandler ^
+      "do nothing for reliable false" ! specify.doesNothingForUnreliable ^
+      "send hug for reliable true" ! specify.sendsHugForReliableClient ^ bt ^
     "when receiving an ask message" ^
-      "reply with the response" ! askSpec.sendsReply ^ end
-    /*"when receiving a shout message" ^
-      "publish the message to the active subscriptions" ! pending ^
+      "reply with the response" ! specify.sendsReply ^
+    "when receiving a shout message" ^
+      "publish the message to the active subscriptions" ! specify.publishesToSubscribers ^
     "when receiving a listen message" ^
-      "add the listener to the active subscriptions" ! pending ^
+      "add a remote listener to the active remote subscriptions" ! specify.addsSubscription ^
+      "add a local listener to the active local subscriptions" ! specify.addsLocalSubscription ^
     "when receiving a deafen message" ^
-      "remove the listener from the active subscriptions" ! pending ^
-  end*/
+      "remove a remote listener from the active remote subscriptions" ! specify.removesSubscription ^
+      "remove a local listener from the active local subscriptions" ! specify.removesLocalSubscription ^
+  end
   
   def controlMessages(req: RequestContext) = {
-    "do nothing for reliable false" ! req.doesNothingForUnreliable ^
-    "send hug for reliable true" ! req.sendsHugForReliableClient
   }
 
   trait ZMQServerContext extends TestKit {
@@ -63,46 +64,29 @@ class ServerSpec extends AkkaSpecification { def is =
   }
 
   def specify = new ServerContext
-  def tellSpec = new TellContext
-  def askSpec = new AskContext
 
-  class AskContext extends RequestContext {
+  class ServerContext extends ZMQServerContext {
 
-    def sendsReply = {
-      val socketLatch = new CountDownLatch(3)
-      val target = "the-reply-target"
-      val sender = "the-sender"
-      val req = Ask(target, sender, ApplicationEvent('pingping))
-      val hug = Hug(req.ccid)
-      val expected = mkMessage(Reply(sender, ApplicationEvent('pongpong), req.ccid)).frames
-      actorOf(new Actor {
-        self.id = target
-        protected def receive = {
-          case ApplicationEvent('pingping, JNothing) => self reply ApplicationEvent('pongpong)
-        }
-      }).start()
+    def respondsWithPong = {
+      val latch = TestLatch(2)
+      val expected = Send(Seq(Frame(clientId), Frame(Pong.toBytes)))
       val socket = actorOf(new Actor {
         def receive = {
-          case Bind(`addressUri`) => socketLatch.countDown
-          case `hug` => socketLatch.countDown
-          case Send(`expected`) => socketLatch.countDown
+          case Bind(`addressUri`) => latch.countDown()
+          case `expected` => latch.countDown()
         }
       }).start()
       val server = TestActorRef(new Server(serverConfig.copy(socket = socket.some))).start()
+      server ! mkMessage(Ping)
+      latch.await(2 seconds) must beTrue 
+    }
+    
+    def tracksReliableClientSessions = {
+      val server = TestActorRef(new Server(serverConfig)).start()
       server ! mkMessage(CanHazHugz)
-      server ! mkMessage(req)
-      socketLatch.await(2, TimeUnit.SECONDS) must beTrue
+      server.underlyingActor.activeClients must be_==(Vector(ClientSession(clientId))).eventually
     }
 
-
-    def routesToCorrectHandler = pending
-
-    def doesNothingForUnreliable = pending
-
-    def sendsHugForReliableClient = pending
-  }
-  
-  class TellContext extends RequestContext {
     def routesToCorrectHandler = {
       val l = new CountDownLatch(1)
       val target = "the-target"
@@ -128,7 +112,7 @@ class ServerSpec extends AkkaSpecification { def is =
         def receive = {
           case Bind(`addressUri`) => socketLatch.countDown
           case `expected` => socketLatch.countDown
-        }  
+        }
       }).start()
       val server = TestActorRef(new Server(serverConfig.copy(socket = socket.some))).start()
 
@@ -145,7 +129,7 @@ class ServerSpec extends AkkaSpecification { def is =
         def receive = {
           case Bind(`addressUri`) => socketLatch.countDown
           case `expected` => socketLatch.countDown
-        }  
+        }
       }).start()
       val server = TestActorRef(new Server(serverConfig.copy(socket = socket.some))).start()
       server ! mkMessage(CanHazHugz)
@@ -153,29 +137,60 @@ class ServerSpec extends AkkaSpecification { def is =
       server ! mkMessage(msg)
       socketLatch.await(2, TimeUnit.SECONDS) must beTrue
     }
-  }
-  
-  class ServerContext extends ZMQServerContext {
 
-    def respondsWithPong = {
-      val latch = TestLatch(2)
-      val expected = Send(Seq(Frame(clientId), Frame(Pong.toBytes)))
-      val socket = actorOf(new Actor {
-        def receive = {
-          case Bind(`addressUri`) => latch.countDown()
-          case `expected` => latch.countDown()
+    def sendsReply = {
+      val socketLatch = new CountDownLatch(3)
+      val target = "the-reply-target"
+      val sender = "the-sender"
+      val req = Ask(target, sender, ApplicationEvent('pingping))
+      val hug = Hug(req.ccid)
+      val expected = mkMessage(Reply(sender, ApplicationEvent('pongpong), req.ccid)).frames
+
+      actorOf(new Actor {
+        self.id = target
+        protected def receive = {
+          case ApplicationEvent('pingping, JNothing) => self reply ApplicationEvent('pongpong)
         }
       }).start()
+      val socket = actorOf(new Actor {
+        def receive = {
+          case Bind(`addressUri`) => socketLatch.countDown
+          case `hug` => socketLatch.countDown
+          case Send(`expected`) => socketLatch.countDown
+        }
+      }).start()
+
       val server = TestActorRef(new Server(serverConfig.copy(socket = socket.some))).start()
-      server ! mkMessage(Ping)
-      latch.await(2 seconds) must beTrue 
+      server ! mkMessage(CanHazHugz)
+      server ! mkMessage(req)
+      socketLatch.await(2, TimeUnit.SECONDS) must beTrue
+    }
+
+    def addsSubscription = {
+      val socketLatch = new CountDownLatch(2)
+      val topic = "the-add-topic"
+      val req = Listen(topic)
+      val hug = Hug(req.ccid)
+      val socket = actorOf(new Actor {
+        def receive = {
+          case Bind(`addressUri`) => socketLatch.countDown
+          case `hug` => socketLatch.countDown
+        }
+      }).start()
+      val remSubscriptions = TestActorRef[Subscriptions.RemoteSubscriptions].start()
+      val server = TestActorRef(new Server(serverConfig.copy(socket = socket.some, remoteSubscriptions = remSubscriptions.some))).start()
+      server ! mkMessage(CanHazHugz)
+      server ! mkMessage(req)
+      socketLatch.await(2, TimeUnit.SECONDS) must beTrue and (
+        remSubscriptions.underlyingActor.topicSubscriptions.size must be_==(1).eventually)
     }
     
-    def tracksReliableClientSessions = {
-      val server = TestActorRef(new Server(serverConfig)).start()
-      server ! mkMessage(CanHazHugz)
-      server.underlyingActor.activeClients must be_==(Vector(ClientSession(clientId))).eventually
-    }
+    def addsLocalSubscription = pending
+
+    def removesSubscription = pending
+    def removesLocalSubscription = pending
+
+    def publishesToSubscribers = pending
 
 
   }
