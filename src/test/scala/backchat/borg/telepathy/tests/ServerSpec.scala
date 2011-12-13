@@ -181,14 +181,50 @@ class ServerSpec extends AkkaSpecification { def is =
       val server = TestActorRef(new Server(serverConfig.copy(socket = socket.some, remoteSubscriptions = remSubscriptions.some))).start()
       server ! mkMessage(CanHazHugz)
       server ! mkMessage(req)
-      socketLatch.await(2, TimeUnit.SECONDS) must beTrue and (
-        remSubscriptions.underlyingActor.topicSubscriptions.size must be_==(1).eventually)
+      remSubscriptions.underlyingActor.topicSubscriptions.size must be_==(1).eventually
     }
     
-    def addsLocalSubscription = pending
+    def addsLocalSubscription = {
+      val topic = "the-add-topic-2"
+      val req = Listen(topic)
+      val remSubscriptions = TestActorRef[Subscriptions.LocalSubscriptions].start()
+      val server = TestActorRef(new Server(serverConfig.copy(localSubscriptions = remSubscriptions.some))).start()
+      server ! req
+      remSubscriptions.underlyingActor.topicSubscriptions.size must be_==(1).eventually
+    }
 
-    def removesSubscription = pending
-    def removesLocalSubscription = pending
+    def removesSubscription =  {
+      val socketLatch = new CountDownLatch(2)
+      val topic = "the-add-topic"
+      val req = Listen(topic)
+      val hug = Hug(req.ccid)
+      val socket = actorOf(new Actor {
+        def receive = {
+          case Bind(`addressUri`) => socketLatch.countDown
+          case `hug` => socketLatch.countDown
+        }
+      }).start()
+      val remSubscriptions = TestActorRef[Subscriptions.RemoteSubscriptions].start()
+      val server = TestActorRef(new Server(serverConfig.copy(socket = socket.some, remoteSubscriptions = remSubscriptions.some))).start()
+      server ! mkMessage(CanHazHugz)
+      server ! mkMessage(req)
+      remSubscriptions.underlyingActor.topicSubscriptions.size must be_==(1).eventually and {
+        server ! mkMessage(Deafen(topic))
+        remSubscriptions.underlyingActor.topicSubscriptions.size must be_==(0).eventually
+      }
+    }
+
+    def removesLocalSubscription = {
+      val topic = "the-add-topic-2"
+      val req = Listen(topic)
+      val remSubscriptions = TestActorRef[Subscriptions.LocalSubscriptions].start()
+      val server = TestActorRef(new Server(serverConfig.copy(localSubscriptions = remSubscriptions.some))).start()
+      server ! req
+      remSubscriptions.underlyingActor.topicSubscriptions.size must be_==(1).eventually and {
+        server ! Deafen(topic)
+        remSubscriptions.underlyingActor.topicSubscriptions.size must be_==(0).eventually
+      }
+    }
 
     def publishesToSubscribers = pending
 

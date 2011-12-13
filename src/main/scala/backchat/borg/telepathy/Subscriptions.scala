@@ -73,14 +73,11 @@ object Subscriptions {
     }
   }
 
-  class LocalSubscriptions extends Actor with Logging {
+  abstract class ChannelSubscriptions extends Actor with Logging {
+    protected[telepathy] var topicSubscriptions = Map[String, Set[UntypedChannel]]()
+    protected[telepathy] var globalSubscriptions = Set[UntypedChannel]()
 
-    self.id = "borg-local-subscriptions"
-
-    private[telepathy] var topicSubscriptions = Map[String, Set[UntypedChannel]]()
-    private[telepathy] var globalSubscriptions = Set[UntypedChannel]()
-
-    private def subscribe(topic: String, subscriber: UntypedChannel) {
+    protected def subscribe(topic: String, subscriber: UntypedChannel) {
       logger debug ("Subscribing to: %s" format topic)
       if (topic.isBlank) {
         globalSubscriptions += subscriber
@@ -93,7 +90,7 @@ object Subscriptions {
       }
     }
 
-    private def unsubscribe(topic: String, subscriber: UntypedChannel) {
+    protected def unsubscribe(topic: String, subscriber: UntypedChannel) {
       logger debug ("Unsubscribing from: %s" format topic)
       if (topic.isBlank) {
         globalSubscriptions -= subscriber
@@ -110,6 +107,37 @@ object Subscriptions {
         }
       }
     }
+
+
+  }
+
+  class LocalSubscriptions extends ChannelSubscriptions {
+    self.id = "borg-local-subscription-proxy"
+
+    protected def receive = {
+      case (m @ Listen("" | null, _), subscriber: UntypedChannel) ⇒ {
+        globalSubscriptions += subscriber
+      }
+      case (m @ Listen(topic, _), subscriber: UntypedChannel) ⇒ {
+        subscribe(topic, subscriber)
+      }
+      case (m @ Deafen("" | null, _), subscriber: UntypedChannel) ⇒ {
+        globalSubscriptions -= subscriber
+      }
+      case (m @ Deafen(topic, _), subscriber: UntypedChannel) ⇒ {
+        unsubscribe(topic, subscriber)
+      }
+      case Shout(topic, payload, _) ⇒ {
+        val matches = globalSubscriptions ++ topicSubscriptions.filterKeys(topic.startsWith(_)).flatMap(_._2).toSet
+        matches foreach { _ ! payload }
+      }
+    }
+
+  }
+
+  class LocalSubscriptionProxy extends ChannelSubscriptions {
+
+    self.id = "borg-local-subscription-proxy"
 
     protected def receive = {
       case (m @ Listen("" | null, _), subscriber: UntypedChannel) ⇒ {
@@ -137,5 +165,7 @@ object Subscriptions {
       }
     }
   }
+
+
 
 }

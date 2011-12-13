@@ -45,7 +45,7 @@ class ClientSpec extends AkkaSpecification { def is =
   
   class ClientSpecContext extends ZeroMqContext {
 
-    val subscriptions = TestActorRef[Subscriptions.LocalSubscriptions].start()
+    val subscriptions = TestActorRef[Subscriptions.LocalSubscriptionProxy].start()
 
     def handlesEnqueue = this {
       withServer() { server =>

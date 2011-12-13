@@ -218,8 +218,8 @@ class Client(config: TelepathClientConfig) extends Telepath {
   private def serialize(msg: BorgMessageWrapper) = serializer.toZMQMessage(msg.unwrapped)
 
   private def spawnSubscriptionManager = {
-    registry.actorFor[Subscriptions.LocalSubscriptions] getOrElse {
-      val subs = actorOf[Subscriptions.LocalSubscriptions]
+    registry.actorFor[Subscriptions.LocalSubscriptionProxy] getOrElse {
+      val subs = actorOf[Subscriptions.LocalSubscriptionProxy]
       realSupervisor startLink subs
       subs
     }
