@@ -15,7 +15,7 @@ import akka.testkit.{ TestKit, TestActorRef }
 object TestTelepathyServer {
   type ZMessageHandler = Seq[Frame] ⇒ Any
   def newContext = ZMQ.context(1)
-  def apply(context: ZMQ.Context, poller: ZeroMQPoller, socketType: Int = ZMQ.XREP, name: String = ""): Server = {
+  def apply(context: ZMQ.Context, poller: ZeroMQPoller, socketType: Int = ZMQ.ROUTER, name: String = ""): Server = {
     val socket = context.socket(socketType)
     val port = FreePort.randomFreePort(50)
     val addr = TelepathAddress("127.0.0.1", port)
@@ -127,7 +127,7 @@ trait ZeroMqContext extends Around with TestKit {
     res
   }
 
-  def withServer[T](socketType: Int = ZMQ.XREP)(fn: TestTelepathyServer.Server ⇒ T)(implicit evidence$1: (T) ⇒ Result): T = {
+  def withServer[T](socketType: Int = ZMQ.ROUTER)(fn: TestTelepathyServer.Server ⇒ T)(implicit evidence$1: (T) ⇒ Result): T = {
     require(zmqContext.isNotNull, "Did you wrap the test method with a `this { ... }`?")
     val poller = new ZeroMQPoller(zmqContext)
     val kv = TestTelepathyServer(zmqContext, poller, socketType = socketType)

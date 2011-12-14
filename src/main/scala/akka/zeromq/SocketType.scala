@@ -9,8 +9,8 @@ object SocketType extends Enumeration {
   type SocketType = Value
   val Pub = Value(JZMQ.PUB)
   val Sub = Value(JZMQ.SUB)
-  val Dealer = Value(JZMQ.XREQ)
-  val Router = Value(JZMQ.XREP)
+  val Dealer = Value(JZMQ.DEALER)
+  val Router = Value(JZMQ.ROUTER)
   val Req = Value(JZMQ.REQ)
   val Rep = Value(JZMQ.REP)
   val Push = Value(JZMQ.PUSH)
