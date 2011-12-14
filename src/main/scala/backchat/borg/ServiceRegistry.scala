@@ -50,6 +50,8 @@ case class ServiceRegistryContext(
   zookeeperConfig: ZooKeeperClientConfig,
   members: ConcurrentMap[String, Node] = new ConcurrentHashMap[String, Node](),
   services: ConcurrentMap[String, Service] = new ConcurrentHashMap[String, Service](),
+  loadBalancerFor: Iterable[Node] => LoadBalancer = LoadBalancer.FirstRegistered,
+  serviceFor: String => Option[Node] = ServiceUnavailableHandler,
   testProbe: Option[ActorRef] = None)
 
 object ServiceRegistry {
@@ -190,11 +192,8 @@ class ServiceRegistry(context: ServiceRegistryContext) extends Actor with Loggin
     case GetNode(id)              ⇒ self tryReply (availableServers get id)
     case GetService(name)         ⇒ self tryReply (availableServices get name)
     case NodeForService(service) ⇒ {
-      val nodes = availableServers.values filter (_.services.contains(service))
-      // TODO: Make this more intelligent by picking a leader when there are more than one possibilities
-      val node = nodes.headOption
-      // TODO: Kick off deployment of the service when there are no services available on the nodes by that name
-      self tryReply (node getOrElse ServiceUnavailable)
+      val foundNode = context loadBalancerFor availableServers.values nodeFor service
+      self tryReply (foundNode getOrElse context.serviceFor(service) )
     }
     case m: ServiceRegistryEvent ⇒ notifyListeners(m)
     case m: NodeMessage          ⇒ worker forward m

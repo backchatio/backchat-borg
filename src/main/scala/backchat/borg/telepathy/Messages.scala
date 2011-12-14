@@ -74,6 +74,9 @@ object Messages extends Logging {
 
   sealed trait InternalMessage
   case object Init extends InternalMessage
+  case object ExpireClientSessions extends InternalMessage
+  case class ExpireClient(client: ClientSession) extends InternalMessage
+  case class ExpireClients(client: Seq[ClientSession]) extends InternalMessage
   case object HappyGoLucky extends InternalMessage
   case object Paranoid extends InternalMessage
   sealed trait Hugging extends InternalMessage

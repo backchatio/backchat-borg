@@ -13,6 +13,7 @@ import java.lang.reflect.Method
 import mojolly.ScheduledTask
 import java.util.concurrent.TimeUnit
 import org.hyperic.sigar.Sigar
+import akka.routing.Listeners
 
 object JmxProcessMetricsProvider {
   private val osMxBean = ManagementFactory.getOperatingSystemMXBean
@@ -92,7 +93,7 @@ object MetricsCollector extends Logging {
   }
 }
 abstract class MetricsCollector[StatsClass <: Stat](interval: Duration = 30.seconds)
-    extends Actor with UsesMetrics with Logging {
+    extends Actor with UsesMetrics with Logging with Listeners {
   private var _lastMeasured: Option[StatsClass] = None
   private var probeTasks: Option[ScheduledTask] = None
 
@@ -137,6 +138,7 @@ abstract class MetricsCollector[StatsClass <: Stat](interval: Duration = 30.seco
     case 'probe ⇒ {
       logger trace "Probing for metrics in %s".format(getClass.getSimpleName)
       _lastMeasured = Some(collectMetrics())
+      gossip(_lastMeasured.get)
     }
   }
 

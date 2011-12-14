@@ -2,9 +2,9 @@ package backchat
 package borg
 package telepathy
 
-import telepathy.Messages.{ HiveRequest, Shout, Deafen, Listen }
 import akka.actor._
 import akka.zeromq.Frame
+import telepathy.Messages._
 
 object Subscriptions {
 
@@ -16,10 +16,10 @@ object Subscriptions {
   class RemoteSubscriptions extends Actor with Logging {
     self.id = "borg-remote-subscriptions"
 
-    private[telepathy] var topicSubscriptions = Map[String, Set[Subscription]]()
-    private[telepathy] var globalSubscriptions = Set[Subscription]()
+    private[telepathy] var topicSubscriptions = Map[String, Set[ClientSession]]()
+    private[telepathy] var globalSubscriptions = Set[ClientSession]()
 
-    private def subscribe(topic: String, subscriber: Subscription) {
+    private def subscribe(topic: String, subscriber: ClientSession) {
       logger debug ("Subscribing to: %s" format topic)
       if (topic.isBlank) {
         globalSubscriptions += subscriber
@@ -33,7 +33,7 @@ object Subscriptions {
       logger debug "Global subs: %s\nTopic subs: %s".format(globalSubscriptions, topicSubscriptions)
     }
 
-    private def unsubscribe(topic: String, subscriber: Subscription) {
+    private def unsubscribe(topic: String, subscriber: ClientSession) {
       logger debug ("Unsubscribing from: %s" format topic)
       if (topic.isBlank) {
         globalSubscriptions -= subscriber
@@ -52,16 +52,32 @@ object Subscriptions {
     }
 
     protected def receive = {
-      case (Listen("" | null, _), subscriber: Subscription) ⇒ {
+      case (Listen("" | null, _), subscriber: ClientSession) ⇒ {
         globalSubscriptions += subscriber
       }
-      case (Listen(topic, _), subscriber: Subscription) ⇒ {
+      case (Listen(topic, _), subscriber: ClientSession) ⇒ {
         subscribe(topic, subscriber)
       }
-      case (Deafen("" | null, _), subscriber: Subscription) ⇒ {
+      case ExpireClient(client) => {
+        globalSubscriptions -= client
+        topicSubscriptions foreach {
+          case (k, v) => {
+            if (v contains client) topicSubscriptions += k -> v.filterNot(client)
+          }
+        }
+      }
+      case ExpireClients(clients) => {
+        globalSubscriptions --= clients
+        topicSubscriptions foreach {
+          case (k, v) => {
+            if (v exists clients.contains) topicSubscriptions += k -> v.filterNot(clients.contains)
+          }
+        }
+      }
+      case (Deafen("" | null, _), subscriber: ClientSession) ⇒ {
         globalSubscriptions -= subscriber
       }
-      case (Deafen(topic, _), subscriber: Subscription) ⇒ {
+      case (Deafen(topic, _), subscriber: ClientSession) ⇒ {
         unsubscribe(topic, subscriber)
       }
       case Shout(topic, payload, _) ⇒ {
