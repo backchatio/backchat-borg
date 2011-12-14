@@ -30,10 +30,10 @@ message BorgMessage {
 
 message Node {
 
-  required uint64 id = 1;
+  required string id = 1;
   required string url = 2;
   repeated string capabilities = 3;
-  repeated Service services = 4;
+  repeated string services = 4;
 }
 
 message TrackerNode {
@@ -69,6 +69,10 @@ message Service {
   optional bytes data = 3;
   required DeploymentType deploy_as = 4 [ default = JAR ];
   required ServiceType provides = 5 [ default = DOMAIN];
+}
+
+message Subscription {
+  repeated bytes addresses = 1;
 }
 
 

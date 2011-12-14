@@ -110,9 +110,10 @@ object BinaryStar {
 
     def apply(msg: BorgMessage) = msg match {
       case BorgMessage(MessageType.System, _, ApplicationEvent('primary, _), _, _) ⇒ PeerPrimary
-      case BorgMessage(MessageType.System, _, ApplicationEvent('backup, _), _, _)  ⇒ PeerBackup
-      case BorgMessage(MessageType.System, _, ApplicationEvent('active, _), _, _)  ⇒ PeerActive
+      case BorgMessage(MessageType.System, _, ApplicationEvent('backup, _), _, _) ⇒ PeerBackup
+      case BorgMessage(MessageType.System, _, ApplicationEvent('active, _), _, _) ⇒ PeerActive
       case BorgMessage(MessageType.System, _, ApplicationEvent('passive, _), _, _) ⇒ PeerPassive
+      case m ⇒ throw new InvalidMessageException(m.toString)
     }
   }
 

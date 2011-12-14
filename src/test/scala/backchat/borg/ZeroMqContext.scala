@@ -3,7 +3,6 @@ package backchat.borg
 import org.zeromq.ZMQ
 import mojolly.io.FreePort
 import org.zeromq.ZMQ.{ Poller, Context, Socket }
-import mojolly.testing.MojollySpecification
 import org.specs2.specification.Around
 import telepathy._
 import util.DynamicVariable
@@ -11,6 +10,7 @@ import org.specs2.execute.Result
 import akka.actor.ActorRef
 import akka.zeromq.{ ZMQMessage, Frame }
 import collection.mutable.ListBuffer
+import akka.testkit.{ TestKit, TestActorRef }
 
 object TestTelepathyServer {
   type ZMessageHandler = Seq[Frame] ⇒ Any
@@ -30,9 +30,9 @@ object TestTelepathyServer {
 
   case class Server(socket: Socket, address: TelepathAddress, poller: ZeroMQPoller, context: ZMQ.Context) {
     def stop = {
-      poller -= socket
+      if (poller.isNotNull) poller -= socket
       socket.close()
-      poller.dispose()
+      if (poller.isNotNull) poller.dispose()
     }
 
     def onMessage(fn: ZMessageHandler) = {
@@ -71,9 +71,9 @@ class ZeroMQPoller(context: Context) {
 
   def -=(socket: Socket) {
     val idx = sockets indexOf socket
-    poller unregister socket
+    if (poller != null) poller unregister socket
     sockets -= socket
-    pollinHandlers remove idx
+    if (idx >= 0) pollinHandlers remove idx
   }
 
   def +=(handler: (Socket, ZMessageHandler)) {
@@ -113,7 +113,7 @@ class ZeroMQPoller(context: Context) {
   def isEmpty = size > 0
 }
 
-trait ZeroMqContext extends Around {
+trait ZeroMqContext extends Around with TestKit {
 
   val deser = new BorgZMQMessageSerializer
 
@@ -128,7 +128,7 @@ trait ZeroMqContext extends Around {
   }
 
   def withServer[T](socketType: Int = ZMQ.XREP)(fn: TestTelepathyServer.Server ⇒ T)(implicit evidence$1: (T) ⇒ Result): T = {
-    require(zmqContext.isNotNull)
+    require(zmqContext.isNotNull, "Did you wrap the test method with a `this { ... }`?")
     val poller = new ZeroMQPoller(zmqContext)
     val kv = TestTelepathyServer(zmqContext, poller, socketType = socketType)
     val res = fn(kv)
@@ -136,8 +136,8 @@ trait ZeroMqContext extends Around {
     res
   }
 
-  def withClient[T](address: TelepathAddress)(fn: ActorRef ⇒ T)(implicit evidence$1: (T) ⇒ Result): T = {
-    val client = newTelepathicClient(address.address)
+  def withClient[T](address: TelepathAddress, subscriptionManager: Option[ActorRef] = None)(fn: TestActorRef[Client] ⇒ T)(implicit evidence$1: (T) ⇒ Result): T = {
+    val client = TestActorRef(new Client(TelepathClientConfig(address, subscriptionManager = subscriptionManager))).start()
     val res = fn(client)
     client.stop()
     res

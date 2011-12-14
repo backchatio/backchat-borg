@@ -3,19 +3,17 @@ package borg
 package cadence
 
 import com.ning.http.client.AsyncHttpClient
-import java.util.concurrent.TimeUnit
 import net.liftweb.json._
 import mojolly._
 import config.{ ConfigurationContext, MojollyConfig }
 import metrics.MetricsConfig
-import akka.actor.Scheduler
 import akka.util.Bootable
 import Alerter._
 
 /**
  * Polls Graphite and logs when a metric passes a threshold.
  */
-class Alerter(config: AlerterConfig) extends Bootable with Logging {
+class Alerter(config: AlerterContext) extends Bootable with Logging {
   lazy val httpClient = new AsyncHttpClient
 
   lazy val alertLogger = Logger("ALERTS")
@@ -23,7 +21,7 @@ class Alerter(config: AlerterConfig) extends Bootable with Logging {
   override def onLoad() {
     super.onLoad()
     logger debug ("polling %s every %d seconds: " format (config.url, config.period))
-    Scheduler schedule (() ⇒ run, 0, config.period, TimeUnit.SECONDS)
+    Timer(config.period.seconds)(run)
   }
 
   override def onUnload() {
@@ -31,18 +29,18 @@ class Alerter(config: AlerterConfig) extends Bootable with Logging {
     httpClient.close()
   }
 
-  def requestUrl = "%s/render?format=json&from=-%ds" format (config.url, config.period)
+  def requestUrl(window: Duration) = "%s/render?format=json&from=-%ds" format (config.url, window.seconds)
 
   def run {
-    val req = (httpClient prepareGet requestUrl)
-    config.alerts foreach { a ⇒
-      req addQueryParameter ("target", a.target)
+    config.alerts foreach { alert ⇒
+      val req = (httpClient prepareGet requestUrl(alert.window))
+      req addQueryParameter ("target", alert.target)
+      val resp = req execute () get ()
+      logger debug ("polling " + resp.getUri)
+      val json = resp.getResponseBody
+      logger debug ("response:" + json)
+      GraphiteResponse(json) foreach handle
     }
-    val resp = req execute () get ()
-    logger debug ("polling " + resp.getUri)
-    val json = resp.getResponseBody
-    logger debug ("response:" + json)
-    GraphiteResponse(json) foreach handle
   }
 
   def warn(a: Alert, m: Metric) = alertLogger warn ("warn threshold for %s passed" format a.target)
@@ -71,21 +69,22 @@ class Alerter(config: AlerterConfig) extends Bootable with Logging {
 object Alerter {
   class AlerterConfig(key: String = "application") extends MojollyConfig(ConfigurationContext(key)) with MetricsConfig {
     val applicationName = "Alerter"
-    val alerts = config.getSection("mojolly.borg.cadence.alerts") map { section ⇒
-      section.keys.map(_.split("\\.", 2)).map(_.head) map { k ⇒
-        Alert(
-          target = section.getString(k + ".graphitekeypattern").get,
-          warn = section.getDouble(k + ".error").get,
-          error = section.getDouble(k + ".warn").get)
-      }
-    } getOrElse Nil
-    val url = "http://%s" format (reporting map (_.host) getOrElse "graphite")
-    val period = config.getSection("mojolly.reporting") flatMap { sect ⇒
-      sect.getInt("pollInterval")
-    } getOrElse 60
+    val alerter = AlerterContext(
+      "http://%s" format (reporting map (_.host) getOrElse "graphite"),
+      config.getSection("mojolly.reporting") flatMap (_.getInt("pollInterval")) getOrElse 60,
+      config.getSection("mojolly.borg.cadence.alerts") map { section ⇒
+        section.keys map { k ⇒
+          val key = k.split("\\.", 2).head
+          Alert(
+            section.getString(key + ".graphitekeypattern").get,
+            section.getDouble(key + ".error").get,
+            section.getDouble(key + ".warn").get)
+        }
+      } getOrElse Nil)
   }
 
-  case class Alert(target: String, warn: Double, error: Double)
+  case class AlerterContext(url: String, period: Int, alerts: Iterable[Alert])
+  case class Alert(target: String, warn: Double, error: Double, window: Duration = 5.minutes)
 
   case class GraphiteResponse(metrics: List[Metric])
   case class Metric(target: String, datapoints: List[Datapoint])

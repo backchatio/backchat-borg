@@ -4,10 +4,11 @@ package tests
 import akka.testkit._
 import akka.actor._
 import Actor.actorOf
-import TrackerRegistry._
 import org.apache.zookeeper.CreateMode
 import util.Random
 import java.util.concurrent.{CountDownLatch, TimeUnit}
+import com.twitter.zookeeper.ZooKeeperClient
+import backchat.borg.TrackerRegistry._
 
 class TrackerRegistrySpec extends ZooKeeperActorSpecification {
 
@@ -21,7 +22,7 @@ class TrackerRegistrySpec extends ZooKeeperActorSpecification {
       "keep the registry in sync with network changes" ! specify.syncsWithNetwork ^
     end
 
-  def specify = new TrackerRegistryContext("/trackers-" + Random.nextInt(300).toString)
+  def specify = new TrackerRegistryContext("/trackers" + Random.nextInt(300).toString)
 
   class TrackerRegistryContext(rootNode: String) extends ZooKeeperClientContext(zookeeperServer, rootNode) with TestKit {
 
@@ -50,9 +51,14 @@ class TrackerRegistrySpec extends ZooKeeperActorSpecification {
     
     def getTheInitialStateForSubtree = {
       setupNodes()
-      
-      val actor = TestActorRef(new TrackerRegistry.TrackerRegistryActor(config)).start()
-      actor.underlyingActor.data.size must be_==(3).eventually
+      val zkTc = new ZooKeeperClient(config)
+      zkTc.connect()
+      val rn = rootNode
+      val context = new TrackerRegistryConfig(zkTc) {
+        override val rootNode = rn
+      }
+      TestActorRef(new TrackerRegistry.TrackerRegistryActor(context)).start()
+      TrackerRegistry.trackers.size must be_==(3).eventually
     }
 
     def getsNodeForKey = {
@@ -67,6 +73,8 @@ class TrackerRegistrySpec extends ZooKeeperActorSpecification {
       lastNode = null
       val started = new CountDownLatch(1)
       val startingLatch = new CountDownLatch(3)
+      val zkTc = new ZooKeeperClient(config)
+      zkTc.connect()
       val l = actorOf(new Actor {
         protected def receive = {
           case 'initialized => started.countDown()
@@ -75,7 +83,12 @@ class TrackerRegistrySpec extends ZooKeeperActorSpecification {
           case _: Messages.TrackerUpdated | _: Messages.TrackerRemoved =>
         }
       }).start()
-      actorOf(new TrackerRegistry.TrackerRegistryActor(config, Some(l))).start()
+      val rn = rootNode
+      val context = new TrackerRegistryConfig(zkTc) {
+        override val testProbe = Some(l)
+        override val rootNode = rn
+      }
+      actorOf(new TrackerRegistry.TrackerRegistryActor(context)).start()
       (started.await(2, TimeUnit.SECONDS) must beTrue) and ({
         setupNodes()
         startingLatch.await(2, TimeUnit.SECONDS) must beTrue

@@ -6,11 +6,11 @@ import akka.actor.{ Actor, Scheduler }
 
 object AlerterApp extends App {
   import Alerter._
-  val poller = new Alerter(new AlerterConfig)
-  poller onLoad ()
+  val poller = new Alerter(new AlerterConfig().alerter)
+  poller.onLoad
   sys.addShutdownHook {
-    poller onUnload ()
-    Scheduler shutdown ()
-    Actor.registry shutdownAll ()
+    poller.onUnload
+    Scheduler.shutdown
+    Actor.registry.shutdownAll
   }
 }

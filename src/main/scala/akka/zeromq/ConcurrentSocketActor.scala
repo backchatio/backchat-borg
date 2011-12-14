@@ -3,11 +3,12 @@
  */
 package akka.zeromq
 
-import akka.actor.{ Actor, ReceiveTimeout }
-import akka.dispatch.MessageDispatcher
+import akka.actor.Actor
 import org.zeromq.ZMQ.{ Socket, Poller }
 import org.zeromq.{ ZMQ ⇒ JZMQ }
 import java.nio.charset.Charset
+import akka.dispatch.{ Future, MessageDispatcher }
+import akka.event.EventHandler
 
 private[zeromq] class ConcurrentSocketActor(params: SocketParameters, dispatcher: MessageDispatcher) extends Actor {
 
@@ -15,7 +16,6 @@ private[zeromq] class ConcurrentSocketActor(params: SocketParameters, dispatcher
   private val socket: Socket = params.context.socket(params.socketType)
   private val poller: Poller = params.context.poller
 
-  self.receiveTimeout = Some(params.pollTimeoutDuration.toMillis)
   self.dispatcher = dispatcher
 
   protected def receive: Receive = {
@@ -34,8 +34,6 @@ private[zeromq] class ConcurrentSocketActor(params: SocketParameters, dispatcher
       socket.subscribe(topic.toArray)
     case Unsubscribe(topic) ⇒
       socket.unsubscribe(topic.toArray)
-    case ReceiveTimeout ⇒
-      pollAndReceiveFrames()
   }
 
   override def preStart {
@@ -61,18 +59,32 @@ private[zeromq] class ConcurrentSocketActor(params: SocketParameters, dispatcher
     }
   }
 
+  private var currentPoll: Option[Future[Boolean]] = None
   private def pollAndReceiveFrames() {
-    def pollSocket: Boolean = {
+    currentPoll = currentPoll orElse Some(newEventLoop)
+  }
+
+  private def newEventLoop =
+    Future {
       poller.poll(params.pollTimeoutDuration.toMillis) > 0 && poller.pollin(0)
-    }
-    if (pollSocket) {
-      receiveFrames() match {
-        case Seq() ⇒
-        case frames ⇒ {
-          notifyListener(params.deserializer(frames))
+    } onComplete { fut ⇒
+      if (fut.get) {
+        receiveFrames() match {
+          case Seq()  ⇒
+          case frames ⇒ notifyListener(params.deserializer(frames))
         }
       }
+      reschedule()
+    } onException {
+      case ex ⇒ {
+        EventHandler.error(ex, this, "There was an error receiving messages on the zeromq socket")
+        reschedule()
+      }
     }
+
+  private def reschedule() {
+    currentPoll = None
+    pollAndReceiveFrames()
   }
 
   private def receiveFrames(): Seq[Frame] = {
