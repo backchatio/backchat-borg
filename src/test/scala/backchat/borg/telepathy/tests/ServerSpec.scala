@@ -163,6 +163,7 @@ class ServerSpec extends AkkaSpecification { def is =
 
       val server = TestActorRef(new Server(serverConfig.copy(socket = socket.some))).start()
       server ! mkMessage(CanHazHugz)
+      sleep -> 200.millis
       server ! mkMessage(req)
       socketLatch.await(3, TimeUnit.SECONDS) must beTrue
     }
@@ -227,13 +228,12 @@ class ServerSpec extends AkkaSpecification { def is =
       }
     }
 
-    def publishesToSubscribers = {
-      val socketLatch = new CountDownLatch(5)
-      val evt = ApplicationEvent('pangpang)
-      val topic = "the-add-topic-3"
+    def publishes(shout: Shout, hugs: Int = 2)(fn: (ActorRef, Shout) => Unit) = {
+      val socketLatch = new CountDownLatch(3 + hugs)
+      val evt = shout.payload
+      val topic = shout.target
       val req = Listen(topic)
       val hug = Hug(req.ccid)
-      val shout = Shout(topic, evt)
       val shoutHug = Hug(shout.ccid)
       val socket = actorOf(new Actor {
         def receive = {
@@ -268,12 +268,22 @@ class ServerSpec extends AkkaSpecification { def is =
       }).start()
       
       localSubscriber ! 'listen
+      sleep -> 200.millis
       server ! mkMessage(CanHazHugz)
       server ! mkMessage(req)
-      server ! mkMessage(shout)
+      sleep -> 200.millis
+      fn(server, shout)
       socketLatch.await(3, TimeUnit.SECONDS) must beTrue
     }
-    def publishesLocalToSubscribers = pending
+
+    def publishesToSubscribers = {
+      val shout = Shout("the-topic-3", ApplicationEvent('pangpang))
+      publishes(shout, 2)(_ ! mkMessage(_))
+    }
+    def publishesLocalToSubscribers = {
+      val shout = Shout("the-topic-4", ApplicationEvent('pingpong))
+      publishes(shout, 1)(_ ! _)
+    }
 
 
   }
