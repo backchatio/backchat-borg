@@ -74,7 +74,6 @@ class Client(config: TelepathClientConfig) extends Telepath {
     }
     case m: Ask ⇒ {
       logger trace "Sending a request to a server: %s".format(m)
-      println("Sending a request to a server: %s".format(m))
       self.senderFuture foreach { fut ⇒
         activeRequests += m.ccid -> fut
         sendToSocketAndExpectHug(m)
@@ -103,7 +102,6 @@ class Client(config: TelepathClientConfig) extends Telepath {
         subscriptionManager ! shout
       }
       case Hug(ccid) ⇒ {
-        println("received a hug %s" format Hug(ccid))
         expectedHugs(ccid).gotIt
         expectedHugs -= ccid
       }

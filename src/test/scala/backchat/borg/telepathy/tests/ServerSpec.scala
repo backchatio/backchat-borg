@@ -26,12 +26,13 @@ class ServerSpec extends AkkaSpecification { def is =
       "do nothing for reliable false" ! specify.doesNothingForUnreliable ^
       "send hug for reliable true" ! specify.sendsHugForReliableClient ^ bt ^
     "when receiving an ask message" ^
-      "reply with the response" ! specify.sendsReply ^
+      "reply with the response" ! specify.sendsReply ^ bt  ^
     "when receiving a shout message" ^
-      "publish the message to the active subscriptions" ! specify.publishesToSubscribers ^
+      "from a remote client, publish the message to the active subscriptions" ! specify.publishesToSubscribers ^
+      "from a local client, publish the message to the active subscriptions" ! specify.publishesLocalToSubscribers ^ bt  ^
     "when receiving a listen message" ^
       "add a remote listener to the active remote subscriptions" ! specify.addsSubscription ^
-      "add a local listener to the active local subscriptions" ! specify.addsLocalSubscription ^
+      "add a local listener to the active local subscriptions" ! specify.addsLocalSubscription ^ bt ^
     "when receiving a deafen message" ^
       "remove a remote listener from the active remote subscriptions" ! specify.removesSubscription ^
       "remove a local listener from the active local subscriptions" ! specify.removesLocalSubscription ^
@@ -163,7 +164,7 @@ class ServerSpec extends AkkaSpecification { def is =
       val server = TestActorRef(new Server(serverConfig.copy(socket = socket.some))).start()
       server ! mkMessage(CanHazHugz)
       server ! mkMessage(req)
-      socketLatch.await(2, TimeUnit.SECONDS) must beTrue
+      socketLatch.await(3, TimeUnit.SECONDS) must beTrue
     }
 
     def addsSubscription = {
@@ -226,7 +227,53 @@ class ServerSpec extends AkkaSpecification { def is =
       }
     }
 
-    def publishesToSubscribers = pending
+    def publishesToSubscribers = {
+      val socketLatch = new CountDownLatch(5)
+      val evt = ApplicationEvent('pangpang)
+      val topic = "the-add-topic-3"
+      val req = Listen(topic)
+      val hug = Hug(req.ccid)
+      val shout = Shout(topic, evt)
+      val shoutHug = Hug(shout.ccid)
+      val socket = actorOf(new Actor {
+        def receive = {
+          case Bind(`addressUri`) => {
+            socketLatch.countDown
+          }
+          case `hug` | `shoutHug` => {
+            socketLatch.countDown
+          }
+          case Send(m) => {
+            Messages(m.last.payload) match {
+              case Shout(`topic`, `evt`, _) => socketLatch.countDown
+              case _ =>
+            }
+          }
+        }
+      }).start()
+      val remSubscriptions = TestActorRef[Subscriptions.RemoteSubscriptions].start()
+      val locSubscriptions = TestActorRef[Subscriptions.LocalSubscriptions].start()
+      val server = TestActorRef(
+        new Server(
+          serverConfig.copy(
+            socket = socket.some, 
+            localSubscriptions = locSubscriptions.some,
+            remoteSubscriptions = remSubscriptions.some))).start()
+      val localSubscriber = actorOf(new Actor {
+        self.id = "local-subscriber"
+        protected def receive = {
+          case 'listen => server ! Listen(topic)
+          case `evt` => socketLatch.countDown()
+        }
+      }).start()
+      
+      localSubscriber ! 'listen
+      server ! mkMessage(CanHazHugz)
+      server ! mkMessage(req)
+      server ! mkMessage(shout)
+      socketLatch.await(3, TimeUnit.SECONDS) must beTrue
+    }
+    def publishesLocalToSubscribers = pending
 
 
   }
