@@ -28,6 +28,7 @@ class ClientSpec extends AkkaSpecification { def is =
         "unsubscribe from pubsub topics" ! context.handlesDeafen ^
         "remove subscription from the subscription manager" ! context.removesSubscriptionFromManager ^bt ^
       "when providing reliability" ^
+        "sends pings to server when inactive for a while" ! context.sendsPings ^
         "expect a hug when the tell was received by the server" ! context.expectsHugForTell ^
         "expect a hug when the ask was received by the server" ! context.expectsHugForAsk ^
         "expect a hug when the shout message was received by the server" ! context.expectsHugForShout ^
@@ -45,7 +46,7 @@ class ClientSpec extends AkkaSpecification { def is =
   
   class ClientSpecContext extends ZeroMqContext {
 
-    val subscriptions = TestActorRef[Subscriptions.LocalSubscriptionProxy].start()
+    val subscriptions = TestActorRef[Subscriptions.RemoteSubscriptionPolicy].start()
 
     def handlesEnqueue = this {
       withServer() { server =>

@@ -97,6 +97,9 @@ object Subscriptions {
       logger debug ("Subscribing to: %s" format topic)
       if (topic.isBlank) {
         globalSubscriptions += subscriber
+        topicSubscriptions foreach {
+          case (k, v) => topicSubscriptions += k -> v.filterNot(_ == subscriber)
+        }
       } else {
         if (topicSubscriptions.contains(topic)) {
           topicSubscriptions += topic -> (topicSubscriptions(topic) + subscriber)
@@ -110,6 +113,9 @@ object Subscriptions {
       logger debug ("Unsubscribing from: %s" format topic)
       if (topic.isBlank) {
         globalSubscriptions -= subscriber
+        topicSubscriptions foreach {
+          case (k, v) => topicSubscriptions += k -> v.filterNot(_ == subscriber)
+        }
       } else {
         if (topicSubscriptions.contains(topic)) {
           val subs = topicSubscriptions(topic)
@@ -151,7 +157,7 @@ object Subscriptions {
 
   }
 
-  class LocalSubscriptionProxy extends ChannelSubscriptions {
+  class RemoteSubscriptionPolicy extends ChannelSubscriptions {
 
     self.id = "borg-local-subscription-proxy"
 

@@ -10,10 +10,11 @@ import akka.dispatch.{Future}
 import telepathy.Subscriptions.PublishTo
 
 case class ServerConfig(
-                         listenOn: TelepathAddress,
-                         socket: Option[ActorRef] = None,
-                         remoteSubscriptions: Option[ActorRef] = None,
-                         localSubscriptions: Option[ActorRef] = None)
+               listenOn: TelepathAddress,
+               socket: Option[ActorRef] = None,
+               remoteSubscriptions: Option[ActorRef] = None,
+               localSubscriptions: Option[ActorRef] = None,
+               clientSessionTimeout: Period = 2 minutes)
 
 object ClientSession {
   def apply(request: ZMQMessage): ClientSession = ClientSession(request.frames.dropRight(1))
@@ -49,7 +50,7 @@ class Server(config: ServerConfig) extends Telepath {
     }
     case ExpireClients => expireClients()
     case request: ZMQMessage if responseFor(request).isDefinedAt(deserialize(request)) ⇒
-      (deserialize _ andThen hugClientIfInNeed(request) andThen responseFor(request))(request) onResult {
+      (deserialize _ andThen manageClientSessionFor(request) andThen responseFor(request))(request) onResult {
         case response: BorgMessageWrapper ⇒ socket ! mkReply(request, response)
         case _ ⇒ // ignore the other ones
       }
@@ -70,7 +71,7 @@ class Server(config: ServerConfig) extends Telepath {
   }
   
   protected def expireClients() {
-    val expired = activeClients filter (_.lastSeen < 2.minutes.ago)
+    val expired = activeClients filter (_.lastSeen < config.clientSessionTimeout.ago)
     if (expired.nonEmpty) {
       activeClients = activeClients filterNot activeClients.contains 
       remoteSubscriptions ! ExpireClients(expired)
@@ -82,31 +83,38 @@ class Server(config: ServerConfig) extends Telepath {
       activeClients :+= session
   }
 
-  protected def slideTimeout(session: ClientSession) {
+  protected def slideTimeout(session: ClientSession) = {
     val withClientId = (cl: ClientSession) => cl.clientId == session.clientId
-    if (activeClients exists withClientId) {
-      activeClients = Vector(((activeClients filter withClientId) :+ session): _*)
-    } else addToClients(session)
+    val exists = activeClients exists withClientId
+    if (exists) {
+      activeClients = Vector(((activeClients filterNot withClientId) :+ session): _*)
+    }
+    exists
   }
 
-  def hugClientIfInNeed(request: ZMQMessage): PartialFunction[BorgMessageWrapper, BorgMessageWrapper] = {
-    case Ping => Ping
-    case CanHazHugz => CanHazHugz
+  def manageClientSessionFor(request: ZMQMessage): PartialFunction[BorgMessageWrapper, BorgMessageWrapper] = {
+    case Ping => {
+      if ( !slideTimeout(ClientSession(request))) {
+        addToClients(ClientSession(request))
+      }
+      Ping
+    }
+    case CanHazHugz => addToClients(ClientSession(request)); CanHazHugz
     case m: HiveRequest ⇒ {
-      if (activeClients contains ClientSession(request)) socket ! Hug(m.ccid)
+      if (slideTimeout(ClientSession(request))) socket ! Hug(m.ccid)
       m
     }
-    case m ⇒ m
+    case m ⇒ {
+      slideTimeout(ClientSession(request))
+      m
+    }
   }
 
   protected def responseFor(request: ZMQMessage): Respond = {
     case Ping ⇒ Future {
-      slideTimeout(ClientSession(request))
       Pong
     }
-    case a@CanHazHugz ⇒ Future {
-      addToClients(ClientSession(request))
-    }
+    case a@CanHazHugz ⇒ Future.empty().completeWithResult(Unit)
     case m: Tell ⇒ Future {
       registry.actorsFor(m.target).headOption foreach {
         _ ! m.payload

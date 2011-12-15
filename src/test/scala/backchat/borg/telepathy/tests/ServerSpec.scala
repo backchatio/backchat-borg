@@ -20,7 +20,6 @@ import java.util.concurrent.{CountDownLatch, TimeUnit}
 class ServerSpec extends AkkaSpecification { def is = sequential ^
   "A Server should" ^
     "respond with pong when receiving a ping" ! specify.respondsWithPong ^
-    "tracks active pubsub client sessions" ! pending ^ // on first subscription
     "tracks active reliable client sessions" ! specify.tracksReliableClientSessions ^ bt ^ // CanHazHugz
     "when receiving a tell message" ^
       "route to the correct handler" ! specify.routesToCorrectHandler ^
@@ -38,9 +37,6 @@ class ServerSpec extends AkkaSpecification { def is = sequential ^
       "remove a remote listener from the active remote subscriptions" ! specify.removesSubscription ^
       "remove a local listener from the active local subscriptions" ! specify.removesLocalSubscription ^
   end
-  
-  def controlMessages(req: RequestContext) = {
-  }
 
   trait ZMQServerContext extends TestKit {
 
@@ -86,7 +82,6 @@ class ServerSpec extends AkkaSpecification { def is = sequential ^
     }
     
     def tracksReliableClientSessions = {
-      DateTimeUtils.setCurrentMillisFixed(System.currentTimeMillis())
       val server = TestActorRef(new Server(serverConfig)).start()
       server ! mkMessage(CanHazHugz)
       server.underlyingActor.activeClients must be_==(Vector(ClientSession(Seq(Frame(clientId.toSeq))))).eventually

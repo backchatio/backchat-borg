@@ -1,5 +1,4 @@
-package backchat
-package borg
+package backchat.borg
 package telepathy
 
 import akka.actor._
@@ -8,13 +7,17 @@ import akka.zeromq._
 import telepathy.Messages._
 import telepathy.Subscriptions.Do
 import akka.dispatch.{ DefaultCompletableFuture, ActorCompletableFuture, Future, CompletableFuture }
+import java.util.concurrent.{TimeUnit, Future => JFuture }
+import scalaz._
+import Scalaz._
 
 case class TelepathClientConfig(
   server: TelepathAddress,
   retries: Int = 3,
-  hugTimeout: Duration = 500.millis,
+  hugTimeout: Duration = 500 millis,
   listener: Option[ActorRef] = None,
-  subscriptionManager: Option[ActorRef] = None)
+  subscriptionManager: Option[ActorRef] = None,
+  pingTimeout: Duration = 30 seconds)
 
 case class ExpectedHug(
     sender: UntypedChannel,
@@ -35,6 +38,9 @@ class Client(config: TelepathClientConfig) extends Telepath {
   lazy val socket = newSocket(SocketType.Dealer, Linger(0L))
   var activeRequests = Map.empty[Uuid, CompletableFuture[Any]]
   var expectedHugs = Map.empty[Uuid, ExpectedHug]
+  private var activePing: Option[CompletableFuture[_]] = None
+  private var pingDelay: Option[JFuture[_]] = None
+  private var cluster: UntypedChannel = NullChannel
 
   val subscriptionManager = config.subscriptionManager getOrElse spawnSubscriptionManager
 
@@ -53,6 +59,7 @@ class Client(config: TelepathClientConfig) extends Telepath {
     }
     case Paranoid ⇒ {
       become(brainDead orElse paranoid)
+      cluster = self.channel
       sendToSocket(CanHazHugz)
     }
     case HappyGoLucky ⇒ {
@@ -92,7 +99,7 @@ class Client(config: TelepathClientConfig) extends Telepath {
       handleSubscription(m)
     }
     case Do(req) ⇒ // subscription manager callbacks
-    case m: ZMQMessage ⇒ deserialize(m) match { // incoming message handler
+    case m: ZMQMessage ⇒ (receivePong _ andThen deserialize _)(m) match { // incoming message handler
       case rep: Reply ⇒ {
         logger trace "processing a reply: %s".format(rep)
         activeRequests get rep.ccid foreach { _ completeWithResult rep.payload }
@@ -105,10 +112,51 @@ class Client(config: TelepathClientConfig) extends Telepath {
         expectedHugs(ccid).gotIt
         expectedHugs -= ccid
       }
-      case Pong ⇒ { //TODO: Handle Pong
-
-      }
+      case Pong ⇒ // already handled
     }
+    case Ping => {
+      sendToSocket(Pong)
+      activePing = pongFuture.some
+    }
+  }
+
+  protected def pongFuture =
+    (Future.empty[Any](config.pingTimeout.millis)
+      onTimeout { _ => moveRequestsToNewServer() }
+      onResult {
+        case _ => {
+          activePing = None
+          schedulePing()
+        }
+      })
+
+  protected def moveRequestsToNewServer() {
+
+  }
+
+
+  private def receivePong(m: ZMQMessage) = {
+    activePing foreach { _.completeWithResult(m) }
+    schedulePing()
+    m
+  }
+
+  private def schedulePing() {
+    pingDelay foreach { _.cancel(true) }
+    if (noRequestsInProgress && noPingInProgress) {
+      pingDelay = Scheduler.scheduleOnce(self, Ping, config.pingTimeout.millis, TimeUnit.MILLISECONDS).some
+    } else {
+      pingDelay = None
+    }
+  }
+
+  private def noPingInProgress = activePing.isEmpty
+  private def noRequestsInProgress = activeRequests.isEmpty && expectedHugs.isEmpty
+
+  protected def cancelPingPong() {
+    pingDelay foreach { _.cancel(true) }
+    pingDelay = None
+    activePing foreach { _.completeWithResult(Pong) }
   }
 
   protected def handleSubscription(m: HiveRequest) {
@@ -122,6 +170,7 @@ class Client(config: TelepathClientConfig) extends Telepath {
   }
 
   protected def sendToSocketAndExpectHug(m: HiveRequest, onComplete: Hugging ⇒ Unit = defaultOnComplete _) {
+    cancelPingPong()
     val fut = hugFuture(m, onComplete)
     expectedHugs += m.ccid -> {
       ExpectedHug(self.channel, fut)
@@ -209,6 +258,7 @@ class Client(config: TelepathClientConfig) extends Telepath {
       }
       case Pong | _: Hug ⇒ //ignore
     }
+    case Ping => //ignore
   }
 
   val serializer = new BorgZMQMessageSerializer
@@ -216,8 +266,8 @@ class Client(config: TelepathClientConfig) extends Telepath {
   private def serialize(msg: BorgMessageWrapper) = serializer.toZMQMessage(msg.unwrapped)
 
   private def spawnSubscriptionManager = {
-    registry.actorFor[Subscriptions.LocalSubscriptionProxy] getOrElse {
-      val subs = actorOf[Subscriptions.LocalSubscriptionProxy]
+    registry.actorFor[Subscriptions.RemoteSubscriptionPolicy] getOrElse {
+      val subs = actorOf[Subscriptions.RemoteSubscriptionPolicy]
       realSupervisor startLink subs
       subs
     }
