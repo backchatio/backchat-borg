@@ -9,7 +9,6 @@ import com.twitter.zookeeper.{ ZooKeeperClient, ZooKeeperClientConfig }
 import akka.routing.{ Deafen, Listen, Listeners }
 import net.liftweb.json._
 import JsonDSL._
-import java.util.concurrent.ConcurrentHashMap
 import collection.mutable.ConcurrentMap
 
 trait TrackerRegistryListener {
@@ -121,7 +120,7 @@ object TrackerRegistry {
     }).start()
   }
 
-  private[borg] val trackers: ConcurrentMap[String, TrackerNode] = new ConcurrentHashMap[String, TrackerNode]()
+  private[borg] val trackers: ConcurrentMap[String, TrackerNode] = mapMaker.makeMap[String, TrackerNode]
   def get(id: String) = trackers.get(id)
 
   def apply(id: String) = get(id).get

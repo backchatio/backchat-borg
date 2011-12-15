@@ -1,6 +1,7 @@
 package backchat
 
 import mojolly.LibraryImports
+import com.google.common.collect.MapMaker
 
 package object borg extends LibraryImports with org.scala_tools.time.Imports {
 
@@ -19,4 +20,6 @@ package object borg extends LibraryImports with org.scala_tools.time.Imports {
     case "double"  ⇒ 0.0.asInstanceOf[T]
     case _         ⇒ null.asInstanceOf[T]
   }
+
+  private[borg] val mapMaker = new MapMaker
 }

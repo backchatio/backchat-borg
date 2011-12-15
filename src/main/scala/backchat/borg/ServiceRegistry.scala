@@ -8,7 +8,6 @@ import akka.config.Supervision
 import Supervision._
 import collection.mutable.{ ConcurrentMap, HashSet }
 import akka.routing.{ Listen, Listeners }
-import java.util.concurrent.ConcurrentHashMap
 
 trait ServiceRegistryListener {
 
@@ -48,10 +47,10 @@ trait ServiceRegistryClient {
 
 case class ServiceRegistryContext(
   zookeeperConfig: ZooKeeperClientConfig,
-  members: ConcurrentMap[String, Node] = new ConcurrentHashMap[String, Node](),
-  services: ConcurrentMap[String, Service] = new ConcurrentHashMap[String, Service](),
+  members: ConcurrentMap[String, Node] = mapMaker.makeMap[String, Node],
+  services: ConcurrentMap[String, Service] = mapMaker.makeMap[String, Service](),
   loadBalancerFor: Iterable[Node] => LoadBalancer = LoadBalancer.FirstRegistered,
-  serviceFor: String => Option[Node] = ServiceUnavailableHandler,
+  serviceFor: String => Option[Node] = ServiceUnavailable,
   testProbe: Option[ActorRef] = None)
 
 object ServiceRegistry {

@@ -65,7 +65,7 @@ class Server(config: ServerConfig) extends Telepath {
       }
     }
     case PublishTo(subscription, topic, payload) ⇒ {
-      socket ! Send(subscription.addresses :+ serialize(Shout(topic, payload)))
+      socket ! Send(subscription.clientId :+ serialize(Shout(topic, payload)))
     }
   }
   
@@ -84,13 +84,14 @@ class Server(config: ServerConfig) extends Telepath {
 
   protected def slideTimeout(session: ClientSession) {
     val withClientId = (cl: ClientSession) => cl.clientId == session.clientId
-    val ac = if (activeClients.size > 500) activeClients.par else activeClients
-    if (ac exists withClientId) {
-      activeClients = Vector(((ac filter withClientId) :+ session): _*)
+    if (activeClients exists withClientId) {
+      activeClients = Vector(((activeClients filter withClientId) :+ session): _*)
     } else addToClients(session)
   }
 
   def hugClientIfInNeed(request: ZMQMessage): PartialFunction[BorgMessageWrapper, BorgMessageWrapper] = {
+    case Ping => Ping
+    case CanHazHugz => CanHazHugz
     case m: HiveRequest ⇒ {
       if (activeClients contains ClientSession(request)) socket ! Hug(m.ccid)
       m

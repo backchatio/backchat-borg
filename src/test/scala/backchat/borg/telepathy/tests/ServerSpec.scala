@@ -14,9 +14,10 @@ import akka.zeromq.{Bind, Send, Frame, ZMQMessage}
 import scalaz.Scalaz._
 import org.specs2.execute.Result
 import net.liftweb.json._
+import org.joda.time.DateTimeUtils
 import java.util.concurrent.{CountDownLatch, TimeUnit}
 
-class ServerSpec extends AkkaSpecification { def is =
+class ServerSpec extends AkkaSpecification { def is = sequential ^
   "A Server should" ^
     "respond with pong when receiving a ping" ! specify.respondsWithPong ^
     "tracks active pubsub client sessions" ! pending ^ // on first subscription
@@ -68,8 +69,10 @@ class ServerSpec extends AkkaSpecification { def is =
 
   class ServerContext extends ZMQServerContext {
 
+    DateTimeUtils.setCurrentMillisFixed(System.currentTimeMillis())
+
     def respondsWithPong = {
-      val latch = TestLatch(2)
+      val latch = new CountDownLatch(2)
       val expected = Send(Seq(Frame(clientId), Frame(Pong.toBytes)))
       val socket = actorOf(new Actor {
         def receive = {
@@ -79,13 +82,14 @@ class ServerSpec extends AkkaSpecification { def is =
       }).start()
       val server = TestActorRef(new Server(serverConfig.copy(socket = socket.some))).start()
       server ! mkMessage(Ping)
-      latch.await(2 seconds) must beTrue 
+      latch.await(2, TimeUnit.SECONDS) must beTrue
     }
     
     def tracksReliableClientSessions = {
+      DateTimeUtils.setCurrentMillisFixed(System.currentTimeMillis())
       val server = TestActorRef(new Server(serverConfig)).start()
       server ! mkMessage(CanHazHugz)
-      server.underlyingActor.activeClients must be_==(Vector(ClientSession(clientId))).eventually
+      server.underlyingActor.activeClients must be_==(Vector(ClientSession(Seq(Frame(clientId.toSeq))))).eventually
     }
 
     def routesToCorrectHandler = {
@@ -155,9 +159,16 @@ class ServerSpec extends AkkaSpecification { def is =
       }).start()
       val socket = actorOf(new Actor {
         def receive = {
-          case Bind(`addressUri`) => socketLatch.countDown
-          case `hug` => socketLatch.countDown
-          case Send(`expected`) => socketLatch.countDown
+          case Bind(`addressUri`) => {
+            socketLatch.countDown
+          }
+          case `hug` => {
+            socketLatch.countDown
+          }
+          case Send(`expected`) => {
+            socketLatch.countDown
+          }
+          case m => println("got: " + m)
         }
       }).start()
 

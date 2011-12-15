@@ -11,7 +11,7 @@ object Subscriptions {
   case class Do(msg: HiveRequest)
   sealed trait RemoteSubscriptionManagement
   case class Subscription(addresses: Seq[Frame]) extends RemoteSubscriptionManagement
-  case class PublishTo(subscription: Subscription, topic: String, payload: ApplicationEvent)
+  case class PublishTo(subscription: ClientSession, topic: String, payload: ApplicationEvent)
 
   class RemoteSubscriptions extends Actor with Logging {
     self.id = "borg-remote-subscriptions"
@@ -62,7 +62,7 @@ object Subscriptions {
         globalSubscriptions -= client
         topicSubscriptions foreach {
           case (k, v) => {
-            if (v contains client) topicSubscriptions += k -> v.filterNot(client)
+            if (v contains client) topicSubscriptions += k -> v.filterNot(_ == client)
           }
         }
       }
