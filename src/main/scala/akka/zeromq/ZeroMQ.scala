@@ -167,7 +167,7 @@ object ZeroMQ {
   def newContext(numIoThreads: Int = 1) = {
     new Context(numIoThreads)
   }
-  def newSocket(params: SocketParameters, supervisor: Option[ActorRef] = None, dispatcher: MessageDispatcher = Dispatchers.defaultGlobalDispatcher): ActorRef = {
+  def newSocket(params: SocketParameters, supervisor: Option[ActorRef] = None, dispatcher: MessageDispatcher = Dispatchers.globalExecutorBasedEventDrivenDispatcher): ActorRef = {
     val socket = Actor.actorOf(new ConcurrentSocketActor(params, dispatcher))
     supervisor.foreach(_.link(socket))
     socket.start

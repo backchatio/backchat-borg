@@ -12,7 +12,7 @@ import rl.Uri
 
 trait Telepath extends Actor with Logging {
 
-  self.dispatcher = telepathyDispatcher
+//  self.dispatcher = telepathyDispatcher
   self.faultHandler = OneForOneStrategy(List(classOf[Throwable]), 5, 3000)
 
   lazy val context = ZeroMQ.newContext()
@@ -36,7 +36,7 @@ trait Telepath extends Actor with Logging {
       deserializer = deserializer,
       pollTimeoutDuration = timeo,
       options = realOptions)
-    ZeroMQ.newSocket(params, self.some, self.dispatcher)
+    ZeroMQ.newSocket(params, self.some, telepathyDispatcher)
   }
 }
 object TelepathAddress {

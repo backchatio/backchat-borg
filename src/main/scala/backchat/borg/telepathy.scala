@@ -9,6 +9,8 @@ package object telepathy {
 
   val telepathyDispatcher = Dispatchers.newExecutorBasedEventDrivenDispatcher("borg-telepathy-dispatcher").build
 
+  def newSocketDispatcher(actor: ActorRef) = Dispatchers.newThreadBasedDispatcher(actor)
+
   private val supervisor =
     Supervisor(SupervisorConfig(OneForOneStrategy(classOf[Throwable] :: Nil, 5, 3000), Nil))
 

@@ -7,8 +7,8 @@ import akka.actor.Actor
 import org.zeromq.ZMQ.{ Socket, Poller }
 import org.zeromq.{ ZMQ ⇒ JZMQ }
 import java.nio.charset.Charset
-import akka.dispatch.{ Future, MessageDispatcher }
 import akka.event.EventHandler
+import akka.dispatch.{Dispatchers, Future, MessageDispatcher}
 
 private[zeromq] class ConcurrentSocketActor(params: SocketParameters, dispatcher: MessageDispatcher) extends Actor {
 
@@ -17,6 +17,7 @@ private[zeromq] class ConcurrentSocketActor(params: SocketParameters, dispatcher
   private val poller: Poller = params.context.poller
 
   self.dispatcher = dispatcher
+//  self.dispatcher = Dispatchers.newThreadBasedDispatcher(self)
 
   protected def receive: Receive = {
     case Send(frames) ⇒

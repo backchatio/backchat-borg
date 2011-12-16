@@ -4,7 +4,6 @@ package telepathy
 package tests
 
 import util.Random
-import mojolly.testing.{AkkaSpecification}
 import akka.actor._
 import Actor._
 import akka.testkit._
@@ -16,8 +15,15 @@ import org.specs2.execute.Result
 import net.liftweb.json._
 import org.joda.time.DateTimeUtils
 import java.util.concurrent.{CountDownLatch, TimeUnit}
+import mojolly.testing.{MojollySpecification, AkkaSpecification}
+import org.specs2.specification._
 
-class ServerSpec extends AkkaSpecification { def is = sequential ^
+trait JodaNowSupport extends MojollySpecification {
+  override def map(fs: ⇒ Fragments) = 
+    Step(DateTimeUtils.setCurrentMillisFixed(System.currentTimeMillis())) ^ super.map(fs) ^ Step(DateTimeUtils.setCurrentMillisSystem())
+}
+
+class ServerSpec extends AkkaSpecification with JodaNowSupport { def is =
   "A Server should" ^
     "respond with pong when receiving a ping" ! specify.respondsWithPong ^
     "tracks active reliable client sessions" ! specify.tracksReliableClientSessions ^ bt ^ // CanHazHugz
@@ -65,7 +71,6 @@ class ServerSpec extends AkkaSpecification { def is = sequential ^
 
   class ServerContext extends ZMQServerContext {
 
-    DateTimeUtils.setCurrentMillisFixed(System.currentTimeMillis())
 
     def respondsWithPong = {
       val latch = new CountDownLatch(2)

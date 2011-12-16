@@ -38,7 +38,7 @@ class Client(config: TelepathClientConfig) extends Telepath {
   lazy val socket = newSocket(SocketType.Dealer, Linger(0L))
   var activeRequests = Map.empty[Uuid, CompletableFuture[Any]]
   var expectedHugs = Map.empty[Uuid, ExpectedHug]
-  private var activePing: Option[CompletableFuture[_]] = None
+  private var activePing: Option[CompletableFuture[Any]] = None
   private var pingDelay: Option[JFuture[_]] = None
   private var cluster: UntypedChannel = NullChannel
 
