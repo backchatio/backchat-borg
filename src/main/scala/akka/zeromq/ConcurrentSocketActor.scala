@@ -8,16 +8,20 @@ import org.zeromq.ZMQ.{ Socket, Poller }
 import org.zeromq.{ ZMQ ⇒ JZMQ }
 import java.nio.charset.Charset
 import akka.event.EventHandler
-import akka.dispatch.{Dispatchers, Future, MessageDispatcher}
+import akka.dispatch.{CompletableFuture, Dispatchers, Future, MessageDispatcher}
 
-private[zeromq] class ConcurrentSocketActor(params: SocketParameters, dispatcher: MessageDispatcher) extends Actor {
+private[zeromq] sealed trait PollLifeCycle
+private[zeromq] case object NoResults extends PollLifeCycle
+private[zeromq] case object Results extends PollLifeCycle
+private[zeromq] case object Closing extends PollLifeCycle
+
+private[zeromq] class ConcurrentSocketActor(params: SocketParameters) extends Actor {
 
   private val noBytes = Array[Byte]()
   private val socket: Socket = params.context.socket(params.socketType)
   private val poller: Poller = params.context.poller
 
-  self.dispatcher = dispatcher
-//  self.dispatcher = Dispatchers.newThreadBasedDispatcher(self)
+  self.dispatcher = Dispatchers.newThreadBasedDispatcher(self)
 
   protected def receive: Receive = {
     case Send(frames) ⇒
@@ -35,6 +39,17 @@ private[zeromq] class ConcurrentSocketActor(params: SocketParameters, dispatcher
       socket.subscribe(topic.toArray)
     case Unsubscribe(topic) ⇒
       socket.unsubscribe(topic.toArray)
+    case 'poll => {
+      currentPoll = None
+      pollAndReceiveFrames()
+    }
+    case 'receiveFrames => {
+      receiveFrames() match {
+        case Seq()  ⇒
+        case frames ⇒ notifyListener(params.deserializer(frames))
+      }
+      self ! 'poll
+    }
   }
 
   override def preStart {
@@ -43,6 +58,7 @@ private[zeromq] class ConcurrentSocketActor(params: SocketParameters, dispatcher
   }
 
   override def postStop {
+    currentPoll foreach { _ completeWithResult Closing }
     poller.unregister(socket)
     socket.close
     notifyListener(Closed)
@@ -60,33 +76,25 @@ private[zeromq] class ConcurrentSocketActor(params: SocketParameters, dispatcher
     }
   }
 
-  private var currentPoll: Option[Future[Boolean]] = None
+  private var currentPoll: Option[CompletableFuture[PollLifeCycle]] = None
   private def pollAndReceiveFrames() {
-    currentPoll = currentPoll orElse Some(newEventLoop)
+    currentPoll = currentPoll orElse Some(newEventLoop.asInstanceOf[CompletableFuture[PollLifeCycle]])
   }
 
   private def newEventLoop =
-    Future {
-      poller.poll(params.pollTimeoutDuration.toMillis) > 0 && poller.pollin(0)
-    } onComplete { fut ⇒
-      if (fut.get) {
-        receiveFrames() match {
-          case Seq()  ⇒
-          case frames ⇒ notifyListener(params.deserializer(frames))
-        }
-      }
-      reschedule()
+    Future({
+      if(poller.poll(params.pollTimeoutDuration.toMillis) > 0 && poller.pollin(0)) Results else NoResults
+    }, params.pollTimeoutDuration.toMillis * 2)(Dispatchers.globalExecutorBasedEventDrivenDispatcher) onResult {
+      case Results => self ! 'receiveFrames
+      case NoResults => self ! 'poll
+      case _ => currentPoll = None
     } onException {
       case ex ⇒ {
         EventHandler.error(ex, this, "There was an error receiving messages on the zeromq socket")
-        reschedule()
+        self ! 'poll
       }
     }
 
-  private def reschedule() {
-    currentPoll = None
-    pollAndReceiveFrames()
-  }
 
   private def receiveFrames(): Seq[Frame] = {
     @inline def receiveBytes(): Array[Byte] = socket.recv(0) match {

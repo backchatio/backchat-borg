@@ -36,7 +36,7 @@ trait Telepath extends Actor with Logging {
       deserializer = deserializer,
       pollTimeoutDuration = timeo,
       options = realOptions)
-    ZeroMQ.newSocket(params, self.some, telepathyDispatcher)
+    ZeroMQ.newSocket(params, self.some)
   }
 }
 object TelepathAddress {
