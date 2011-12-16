@@ -5,6 +5,8 @@ import sbtprotobuf.{ProtobufPlugin => PB}
 
 seq(buildSettings:_*)
 
+seq(formatSettings:_*)
+
 seq(PB.protobufSettings:_*)
 
 name := "backchat-borg"

@@ -58,18 +58,18 @@ object Subscriptions {
       case (Listen(topic, _), subscriber: ClientSession) ⇒ {
         subscribe(topic, subscriber)
       }
-      case ExpireClient(client) => {
+      case ExpireClient(client) ⇒ {
         globalSubscriptions -= client
         topicSubscriptions foreach {
-          case (k, v) => {
+          case (k, v) ⇒ {
             if (v contains client) topicSubscriptions += k -> v.filterNot(_ == client)
           }
         }
       }
-      case ExpireClients(clients) => {
+      case ExpireClients(clients) ⇒ {
         globalSubscriptions --= clients
         topicSubscriptions foreach {
-          case (k, v) => {
+          case (k, v) ⇒ {
             if (v exists clients.contains) topicSubscriptions += k -> v.filterNot(clients.contains)
           }
         }
@@ -98,7 +98,7 @@ object Subscriptions {
       if (topic.isBlank) {
         globalSubscriptions += subscriber
         topicSubscriptions foreach {
-          case (k, v) => topicSubscriptions += k -> v.filterNot(_ == subscriber)
+          case (k, v) ⇒ topicSubscriptions += k -> v.filterNot(_ == subscriber)
         }
       } else {
         if (topicSubscriptions.contains(topic)) {
@@ -114,7 +114,7 @@ object Subscriptions {
       if (topic.isBlank) {
         globalSubscriptions -= subscriber
         topicSubscriptions foreach {
-          case (k, v) => topicSubscriptions += k -> v.filterNot(_ == subscriber)
+          case (k, v) ⇒ topicSubscriptions += k -> v.filterNot(_ == subscriber)
         }
       } else {
         if (topicSubscriptions.contains(topic)) {
@@ -129,7 +129,6 @@ object Subscriptions {
         }
       }
     }
-
 
   }
 
@@ -187,7 +186,5 @@ object Subscriptions {
       }
     }
   }
-
-
 
 }

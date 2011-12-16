@@ -49,8 +49,8 @@ case class ServiceRegistryContext(
   zookeeperConfig: ZooKeeperClientConfig,
   members: ConcurrentMap[String, Node] = mapMaker.makeMap[String, Node],
   services: ConcurrentMap[String, Service] = mapMaker.makeMap[String, Service](),
-  loadBalancerFor: Iterable[Node] => LoadBalancer = LoadBalancer.FirstRegistered,
-  serviceFor: String => Option[Node] = ServiceUnavailable,
+  loadBalancerFor: Iterable[Node] ⇒ LoadBalancer = LoadBalancer.FirstRegistered,
+  serviceFor: String ⇒ Option[Node] = ServiceUnavailable,
   testProbe: Option[ActorRef] = None)
 
 object ServiceRegistry {
@@ -192,7 +192,7 @@ class ServiceRegistry(context: ServiceRegistryContext) extends Actor with Loggin
     case GetService(name)         ⇒ self tryReply (availableServices get name)
     case NodeForService(service) ⇒ {
       val foundNode = context loadBalancerFor availableServers.values nodeFor service
-      self tryReply (foundNode getOrElse context.serviceFor(service) )
+      self tryReply (foundNode getOrElse context.serviceFor(service))
     }
     case m: ServiceRegistryEvent ⇒ notifyListeners(m)
     case m: NodeMessage          ⇒ worker forward m

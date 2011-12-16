@@ -7,7 +7,7 @@ import akka.zeromq._
 import telepathy.Messages._
 import telepathy.Subscriptions.Do
 import akka.dispatch.{ DefaultCompletableFuture, ActorCompletableFuture, Future, CompletableFuture }
-import java.util.concurrent.{TimeUnit, Future => JFuture }
+import java.util.concurrent.{ TimeUnit, Future ⇒ JFuture }
 import scalaz._
 import Scalaz._
 
@@ -114,7 +114,7 @@ class Client(config: TelepathClientConfig) extends Telepath {
       }
       case Pong ⇒ // already handled
     }
-    case Ping => {
+    case Ping ⇒ {
       sendToSocket(Pong)
       activePing = pongFuture.some
     }
@@ -122,9 +122,9 @@ class Client(config: TelepathClientConfig) extends Telepath {
 
   protected def pongFuture =
     (Future.empty[Any](config.pingTimeout.millis)
-      onTimeout { _ => moveRequestsToNewServer() }
+      onTimeout { _ ⇒ moveRequestsToNewServer() }
       onResult {
-        case _ => {
+        case _ ⇒ {
           activePing = None
           schedulePing()
         }
@@ -133,7 +133,6 @@ class Client(config: TelepathClientConfig) extends Telepath {
   protected def moveRequestsToNewServer() {
 
   }
-
 
   private def receivePong(m: ZMQMessage) = {
     activePing foreach { _.completeWithResult(m) }
@@ -258,7 +257,7 @@ class Client(config: TelepathClientConfig) extends Telepath {
       }
       case Pong | _: Hug ⇒ //ignore
     }
-    case Ping => //ignore
+    case Ping ⇒ //ignore
   }
 
   val serializer = new BorgZMQMessageSerializer

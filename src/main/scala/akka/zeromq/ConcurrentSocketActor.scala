@@ -3,17 +3,16 @@
  */
 package akka.zeromq
 
-import org.zeromq.ZMQ.{Socket, Poller}
-import org.zeromq.{ZMQ => JZMQ}
+import org.zeromq.ZMQ.{ Socket, Poller }
+import org.zeromq.{ ZMQ ⇒ JZMQ }
 import akka.event.EventHandler
 import akka.actor._
-import akka.dispatch.{CompletableFuture, Dispatchers, MessageDispatcher, Future}
+import akka.dispatch.{ CompletableFuture, Dispatchers, MessageDispatcher, Future }
 
 private[zeromq] sealed trait PollLifeCycle
 private[zeromq] case object NoResults extends PollLifeCycle
 private[zeromq] case object Results extends PollLifeCycle
 private[zeromq] case object Closing extends PollLifeCycle
-
 
 private[zeromq] class ConcurrentSocketActor(params: SocketParameters, dispatcher: MessageDispatcher) extends Actor {
 
@@ -27,112 +26,111 @@ private[zeromq] class ConcurrentSocketActor(params: SocketParameters, dispatcher
       newExecutorBasedEventDrivenDispatcher "zeromq-send-%s".format(self.uuid)
       setAllowCoreThreadTimeout true
       setCorePoolSize 1
-      setMaxPoolSize 1
-      build)
+      setMaxPoolSize 1 build)
 
   override def receive: Receive = {
-    case Send(frames) =>
+    case Send(frames) ⇒
       sendFrames(frames)
       pollAndReceiveFrames()
-    case ZMQMessage(frames) =>
+    case ZMQMessage(frames) ⇒
       sendFrames(frames)
       pollAndReceiveFrames()
-    case Connect(endpoint) =>
+    case Connect(endpoint) ⇒
       socket.connect(endpoint)
       notifyListener(Connecting)
       pollAndReceiveFrames()
-    case Bind(endpoint) =>
+    case Bind(endpoint) ⇒
       socket.bind(endpoint)
       pollAndReceiveFrames()
-    case Subscribe(topic) =>
+    case Subscribe(topic) ⇒
       socket.subscribe(topic.toArray)
       pollAndReceiveFrames()
-    case Unsubscribe(topic) =>
+    case Unsubscribe(topic) ⇒
       socket.unsubscribe(topic.toArray)
       pollAndReceiveFrames()
-    case Linger(value) =>
+    case Linger(value) ⇒
       socket.setLinger(value)
-    case Linger =>
+    case Linger ⇒
       self.reply(socket.getLinger)
-    case ReconnectIVL =>
+    case ReconnectIVL ⇒
       self.reply(socket.getReconnectIVL)
-    case ReconnectIVL(value) =>
+    case ReconnectIVL(value) ⇒
       socket.setReconnectIVL(value)
-    case Backlog =>
+    case Backlog ⇒
       self.reply(socket.getBacklog)
-    case Backlog(value) =>
+    case Backlog(value) ⇒
       socket.setBacklog(value)
-    case ReconnectIVLMax =>
+    case ReconnectIVLMax ⇒
       self.reply(socket.getReconnectIVLMax)
-    case ReconnectIVLMax(value) =>
+    case ReconnectIVLMax(value) ⇒
       socket.setReconnectIVLMax(value)
-    case MaxMsgSize =>
+    case MaxMsgSize ⇒
       self.reply(socket.getMaxMsgSize)
-    case MaxMsgSize(value) =>
+    case MaxMsgSize(value) ⇒
       socket.setMaxMsgSize(value)
-    case SndHWM =>
+    case SndHWM ⇒
       self.reply(socket.getSndHWM)
-    case SndHWM(value) =>
+    case SndHWM(value) ⇒
       socket.setSndHWM(value)
-    case RcvHWM =>
+    case RcvHWM ⇒
       self.reply(socket.getRcvHWM)
-    case RcvHWM(value) =>
+    case RcvHWM(value) ⇒
       socket.setRcvHWM(value)
-    case HWM(value) =>
+    case HWM(value) ⇒
       socket.setHWM(value)
-    case Swap =>
+    case Swap ⇒
       self.reply(socket.getSwap)
-    case Swap(value) =>
+    case Swap(value) ⇒
       socket.setSwap(value)
-    case Affinity =>
+    case Affinity ⇒
       self.reply(socket.getAffinity)
-    case Affinity(value) =>
+    case Affinity(value) ⇒
       socket.setAffinity(value)
-    case Identity =>
+    case Identity ⇒
       self.reply(socket.getIdentity)
-    case Identity(value) =>
+    case Identity(value) ⇒
       socket.setIdentity(value)
-    case Rate =>
+    case Rate ⇒
       self.reply(socket.getRate)
-    case Rate(value) =>
+    case Rate(value) ⇒
       socket.setRate(value)
-    case RecoveryInterval =>
+    case RecoveryInterval ⇒
       self.reply(socket.getRecoveryInterval)
-    case RecoveryInterval(value) =>
+    case RecoveryInterval(value) ⇒
       socket.setRecoveryInterval(value)
-    case MulticastLoop =>
+    case MulticastLoop ⇒
       self.reply(socket.hasMulticastLoop)
-    case MulticastLoop(value) =>
+    case MulticastLoop(value) ⇒
       socket.setMulticastLoop(value)
-    case MulticastHops =>
+    case MulticastHops ⇒
       self.reply(socket.getMulticastHops)
-    case MulticastHops(value) =>
+    case MulticastHops(value) ⇒
       socket.setMulticastHops(value)
-    case ReceiveTimeOut =>
+    case ReceiveTimeOut ⇒
       self.reply(socket.getReceiveTimeOut)
-    case ReceiveTimeOut(value) =>
+    case ReceiveTimeOut(value) ⇒
       socket.setReceiveTimeOut(value)
-    case SendTimeOut =>
+    case SendTimeOut ⇒
       self.reply(socket.getSendTimeOut)
-    case SendTimeOut(value) =>
+    case SendTimeOut(value) ⇒
       socket.setSendTimeOut(value)
-    case SendBufferSize =>
+    case SendBufferSize ⇒
       self.reply(socket.getSendBufferSize)
-    case SendBufferSize(value) =>
+    case SendBufferSize(value) ⇒
       socket.setSendBufferSize(value)
-    case ReceiveBufferSize =>
+    case ReceiveBufferSize ⇒
       self.reply(socket.getReceiveBufferSize)
-    case ReceiveBufferSize(value) =>
+    case ReceiveBufferSize(value) ⇒
       socket.setReceiveBufferSize(value)
-    case ReceiveMore =>
+    case ReceiveMore ⇒
       self.reply(socket.hasReceiveMore)
-    case FileDescriptor =>
+    case FileDescriptor ⇒
       self.reply(socket.getFD)
-    case 'poll => {
+    case 'poll ⇒ {
       currentPoll = None
       pollAndReceiveFrames()
     }
-    case 'receiveFrames => {
+    case 'receiveFrames ⇒ {
       receiveFrames() match {
         case Seq()  ⇒
         case frames ⇒ notifyListener(params.deserializer(frames))
@@ -151,7 +149,7 @@ private[zeromq] class ConcurrentSocketActor(params: SocketParameters, dispatcher
     socket.close
     notifyListener(Closed)
   }
-  
+
   private def sendFrames(frames: Seq[Frame]) {
     def sendBytes(bytes: Seq[Byte], flags: Int) {
       socket.send(bytes.toArray, flags)
@@ -163,7 +161,7 @@ private[zeromq] class ConcurrentSocketActor(params: SocketParameters, dispatcher
       sendBytes(payload, flags)
     }
   }
-  
+
   private var currentPoll: Option[CompletableFuture[PollLifeCycle]] = None
   private def pollAndReceiveFrames() {
     currentPoll = currentPoll orElse Some(newEventLoop.asInstanceOf[CompletableFuture[PollLifeCycle]])
@@ -171,11 +169,11 @@ private[zeromq] class ConcurrentSocketActor(params: SocketParameters, dispatcher
 
   private def newEventLoop = {
     Future({
-      if(poller.poll(params.pollTimeoutDuration.toMillis) > 0 && poller.pollin(0)) Results else NoResults
+      if (poller.poll(params.pollTimeoutDuration.toMillis) > 0 && poller.pollin(0)) Results else NoResults
     }, params.pollTimeoutDuration.toMillis * 2)(sendDispatcher) onResult {
-      case Results => if (self.isRunning) self ! 'receiveFrames
-      case NoResults => if (self.isRunning) self ! 'poll
-      case _ => currentPoll = None
+      case Results   ⇒ if (self.isRunning) self ! 'receiveFrames
+      case NoResults ⇒ if (self.isRunning) self ! 'poll
+      case _         ⇒ currentPoll = None
     } onException {
       case ex ⇒ {
         EventHandler.error(ex, this, "There was an error receiving messages on the zeromq socket")
@@ -183,29 +181,29 @@ private[zeromq] class ConcurrentSocketActor(params: SocketParameters, dispatcher
       }
     }
   }
-  
+
   private def receiveFrames(): Seq[Frame] = {
-    
+
     @inline def receiveBytes(): Array[Byte] = socket.recv(0) match {
-      case null => noBytes
-      case bytes: Array[Byte] if bytes.length > 0 => bytes
-      case _ => noBytes
+      case null                                   ⇒ noBytes
+      case bytes: Array[Byte] if bytes.length > 0 ⇒ bytes
+      case _                                      ⇒ noBytes
     }
 
     receiveBytes() match {
-      case `noBytes` => Vector.empty
-      case someBytes =>
+      case `noBytes` ⇒ Vector.empty
+      case someBytes ⇒
         var frames = Vector(Frame(someBytes))
         while (socket.hasReceiveMore) receiveBytes() match {
-          case `noBytes` =>
-          case someBytes => frames :+= Frame(someBytes)
+          case `noBytes` ⇒
+          case someBytes ⇒ frames :+= Frame(someBytes)
         }
         frames
     }
   }
-  
+
   private def notifyListener(message: Any) {
-    params.listener.foreach { listener =>
+    params.listener.foreach { listener ⇒
       if (listener.isShutdown)
         self.stop
       else

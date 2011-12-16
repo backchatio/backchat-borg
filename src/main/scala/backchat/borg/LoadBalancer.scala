@@ -7,8 +7,8 @@ trait LoadBalancer {
 }
 
 object LoadBalancer {
-  val FirstRegistered = (nodes: Iterable[Node]) => new FirstRegistered(nodes)
-  val LeastBusy = (nodes: Iterable[Node]) => new LeastBusy(nodes)
+  val FirstRegistered = (nodes: Iterable[Node]) ⇒ new FirstRegistered(nodes)
+  val LeastBusy = (nodes: Iterable[Node]) ⇒ new LeastBusy(nodes)
 }
 class FirstRegistered(protected val nodes: Iterable[Node]) extends LoadBalancer {
   def nodeFor(service: String) = {
@@ -19,7 +19,6 @@ class FirstRegistered(protected val nodes: Iterable[Node]) extends LoadBalancer 
 class LeastBusy(protected val nodes: Iterable[Node]) extends LoadBalancer {
   def nodeFor(service: String) = {
     (nodes
-      filter (_.services contains service)
-      headOption)
+      filter (_.services contains service) headOption)
   }
 }

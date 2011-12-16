@@ -1,6 +1,6 @@
 package backchat.borg
 
-trait ServiceFactory extends (String => Option[Node])
+trait ServiceFactory extends (String ⇒ Option[Node])
 
 object ServiceUnavailable extends ServiceFactory with Logging {
   def apply(service: String) = {

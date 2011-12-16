@@ -6,15 +6,15 @@ import Messages._
 import akka.actor._
 import Actor._
 import akka.zeromq._
-import akka.dispatch.{Future}
+import akka.dispatch.{ Future }
 import telepathy.Subscriptions.PublishTo
 
 case class ServerConfig(
-               listenOn: TelepathAddress,
-               socket: Option[ActorRef] = None,
-               remoteSubscriptions: Option[ActorRef] = None,
-               localSubscriptions: Option[ActorRef] = None,
-               clientSessionTimeout: Period = 2 minutes)
+  listenOn: TelepathAddress,
+  socket: Option[ActorRef] = None,
+  remoteSubscriptions: Option[ActorRef] = None,
+  localSubscriptions: Option[ActorRef] = None,
+  clientSessionTimeout: Period = 2 minutes)
 
 object ClientSession {
   def apply(request: ZMQMessage): ClientSession = ClientSession(request.frames.dropRight(1))
@@ -48,17 +48,17 @@ class Server(config: ServerConfig) extends Telepath {
       socket ! Bind(self.id)
       logger info "Server %s is ready".format(self.id)
     }
-    case ExpireClients => expireClients()
+    case ExpireClients ⇒ expireClients()
     case request: ZMQMessage if responseFor(request).isDefinedAt(deserialize(request)) ⇒
       (deserialize _ andThen manageClientSessionFor(request) andThen responseFor(request))(request) onResult {
         case response: BorgMessageWrapper ⇒ socket ! mkReply(request, response)
-        case _ ⇒ // ignore the other ones
+        case _                            ⇒ // ignore the other ones
       }
     case m: Listen ⇒ {
-      localSubscriptions !(m, self.channel)
+      localSubscriptions ! (m, self.channel)
     }
     case m: Deafen ⇒ {
-      localSubscriptions !(m, self.channel)
+      localSubscriptions ! (m, self.channel)
     }
     case m: Shout ⇒ {
       Vector(remoteSubscriptions, localSubscriptions) foreach {
@@ -69,11 +69,11 @@ class Server(config: ServerConfig) extends Telepath {
       socket ! Send(subscription.clientId :+ serialize(Shout(topic, payload)))
     }
   }
-  
+
   protected def expireClients() {
     val expired = activeClients filter (_.lastSeen < config.clientSessionTimeout.ago)
     if (expired.nonEmpty) {
-      activeClients = activeClients filterNot activeClients.contains 
+      activeClients = activeClients filterNot activeClients.contains
       remoteSubscriptions ! ExpireClients(expired)
     }
   }
@@ -84,7 +84,7 @@ class Server(config: ServerConfig) extends Telepath {
   }
 
   protected def slideTimeout(session: ClientSession) = {
-    val withClientId = (cl: ClientSession) => cl.clientId == session.clientId
+    val withClientId = (cl: ClientSession) ⇒ cl.clientId == session.clientId
     val exists = activeClients exists withClientId
     if (exists) {
       activeClients = Vector(((activeClients filterNot withClientId) :+ session): _*)
@@ -93,13 +93,13 @@ class Server(config: ServerConfig) extends Telepath {
   }
 
   def manageClientSessionFor(request: ZMQMessage): PartialFunction[BorgMessageWrapper, BorgMessageWrapper] = {
-    case Ping => {
-      if ( !slideTimeout(ClientSession(request))) {
+    case Ping ⇒ {
+      if (!slideTimeout(ClientSession(request))) {
         addToClients(ClientSession(request))
       }
       Ping
     }
-    case CanHazHugz => addToClients(ClientSession(request)); CanHazHugz
+    case CanHazHugz ⇒ addToClients(ClientSession(request)); CanHazHugz
     case m: HiveRequest ⇒ {
       if (slideTimeout(ClientSession(request))) socket ! Hug(m.ccid)
       m
@@ -114,7 +114,7 @@ class Server(config: ServerConfig) extends Telepath {
     case Ping ⇒ Future {
       Pong
     }
-    case a@CanHazHugz ⇒ Future.empty().completeWithResult(Unit)
+    case a @ CanHazHugz ⇒ Future.empty().completeWithResult(Unit)
     case m: Tell ⇒ Future {
       registry.actorsFor(m.target).headOption foreach {
         _ ! m.payload
@@ -132,10 +132,10 @@ class Server(config: ServerConfig) extends Telepath {
       } getOrElse m.serviceUnavailable
     }
     case m: Listen ⇒ Future {
-      remoteSubscriptions !(m, ClientSession(request))
+      remoteSubscriptions ! (m, ClientSession(request))
     }
     case m: Deafen ⇒ Future {
-      remoteSubscriptions !(m, ClientSession(request))
+      remoteSubscriptions ! (m, ClientSession(request))
     }
     case m: Shout ⇒ Future {
       Vector(remoteSubscriptions, localSubscriptions) foreach {

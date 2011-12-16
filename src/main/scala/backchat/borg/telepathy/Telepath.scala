@@ -11,15 +11,15 @@ import akka.config.Supervision._
 import rl.Uri
 
 case class SocketParams(
-              socketType: SocketType.Value,
-              timeout: Duration = 100 millis, 
-              deserializer: Deserializer = new ZMQMessageDeserializer,
-              listener: Option[ActorRef] = None)
+  socketType: SocketType.Value,
+  timeout: Duration = 100 millis,
+  deserializer: Deserializer = new ZMQMessageDeserializer,
+  listener: Option[ActorRef] = None)
 trait Telepath extends Actor with Logging {
-  
+
   implicit def duration2akkaduration(dur: Duration) = akka.util.Duration(dur.millis, TimeUnit.MILLISECONDS)
 
-//  self.dispatcher = telepathyDispatcher
+  //  self.dispatcher = telepathyDispatcher
   self.faultHandler = OneForOneStrategy(List(classOf[Throwable]), 5, 3000)
 
   lazy val context = ZeroMQ.newContext()
