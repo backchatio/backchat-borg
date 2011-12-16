@@ -33,7 +33,7 @@ libraryDependencies ++= Seq(
   mojollyLibrary("core"),
   mojollyLibrary("io"),
   mojollyLibrary("metrics"),
-  "org.zeromq" %% "zeromq-scala-binding" % "0.0.3",
+  akka("zeromq"),
   commons("codec", "1.5"),
   akka("slf4j"),
   "org.apache.hadoop.zookeeper" % "zookeeper" % "3.4.0",
