@@ -10,7 +10,14 @@ import akka.zeromq._
 import akka.config.Supervision._
 import rl.Uri
 
+case class SocketParams(
+              socketType: SocketType.Value,
+              timeout: Duration = 100 millis, 
+              deserializer: Deserializer = new ZMQMessageDeserializer,
+              listener: Option[ActorRef] = None)
 trait Telepath extends Actor with Logging {
+  
+  implicit def duration2akkaduration(dur: Duration) = akka.util.Duration(dur.millis, TimeUnit.MILLISECONDS)
 
 //  self.dispatcher = telepathyDispatcher
   self.faultHandler = OneForOneStrategy(List(classOf[Throwable]), 5, 3000)
@@ -20,23 +27,16 @@ trait Telepath extends Actor with Logging {
   def socketListener: Option[ActorRef] = self.some
   implicit def osa2oa(opt: Option[ScalaActorRef]): Option[ActorRef] = opt map (_.asInstanceOf[ActorRef])
 
-  protected def newSocket(socketType: SocketType.Value, options: SocketOption*) = {
-    val socketTimeout = options find (_.isInstanceOf[Timeout]) map (_.asInstanceOf[Timeout].value) getOrElse 100L
-    val deserializer = options find (_.isInstanceOf[MessageDeserializer]) map (_.asInstanceOf[MessageDeserializer].value) getOrElse new ZMQMessageDeserializer
-    val listener: Option[ActorRef] = options find (_.isInstanceOf[SocketListener]) map (_.asInstanceOf[SocketListener].value) orElse Some(self)
-    val timeo = akka.util.Duration(socketTimeout, TimeUnit.MILLISECONDS)
-    val realOptions = options filterNot {
-      case _: Timeout | _: MessageDeserializer | _: SocketListener ⇒ true
-      case _ ⇒ false
-    }
-    val params = SocketParameters(
+  protected def newSocket(params: SocketParams, options: SocketOption*) = {
+    val parameters = SocketParameters(
       context,
-      socketType,
-      listener,
-      deserializer = deserializer,
-      pollTimeoutDuration = timeo,
-      options = realOptions)
-    ZeroMQ.newSocket(params, self.some)
+      params.socketType,
+      params.listener orElse Some(self),
+      deserializer = params.deserializer,
+      pollTimeoutDuration = params.timeout)
+    val sock = ZeroMQ.newSocket(parameters, self.some)
+    options foreach { sock ! _ }
+    sock
   }
 }
 object TelepathAddress {

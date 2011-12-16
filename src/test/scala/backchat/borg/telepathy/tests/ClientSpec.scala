@@ -16,10 +16,8 @@ import org.multiverse.api.latches.StandardLatch
 import akka.testkit.{TestLatch, TestActorRef}
 
 class ClientSpec extends AkkaSpecification { def is =
-/*
-*/
-    "A telepathic client should" ^
-      "when responding to messages" ^
+  "A telepathic client should" ^
+    "when responding to messages" ^
         "handle an enqueue message" ! context.handlesEnqueue ^
         "handle a request message" ! context.handlesRequest ^
         "publish messages to a pubsub server" ! context.handlesShout ^
@@ -34,11 +32,11 @@ class ClientSpec extends AkkaSpecification { def is =
         "expect a hug when the shout message was received by the server" ! context.expectsHugForShout ^
         "expect a hug when the listen message was received by the server" ! context.expectsHugForListen ^
         "expect a hug when the deafen message was received by the server" ! context.expectsHugForDeafen ^
-        "reschedule a tell message when no hug received within the time limt" ! context.handlesNoHugsForTell ^
-        "reschedule an ask message when no hug received within the time limt" ! context.handlesNoHugsForAsk ^
-        "reschedule a shout message when no hug received within the time limt" ! context.handlesNoHugsForShout ^
-        "reschedule a listen message when no hug received within the time limt" ! context.handlesNoHugsForListen ^
-        "reschedule a deafen message when no hug received within the time limt" ! context.handlesNoHugsForDeafen ^
+        "reschedule a tell message when no hug received within the time limit" ! context.handlesNoHugsForTell ^
+        "reschedule an ask message when no hug received within the time limit" ! context.handlesNoHugsForAsk ^
+        "reschedule a shout message when no hug received within the time limit" ! context.handlesNoHugsForShout ^
+        "reschedule a listen message when no hug received within the time limit" ! context.handlesNoHugsForListen ^
+        "reschedule a deafen message when no hug received within the time limit" ! context.handlesNoHugsForDeafen ^
         "send pings to the server if no activity for the specified period" ! context.sendsPings ^
     end
   

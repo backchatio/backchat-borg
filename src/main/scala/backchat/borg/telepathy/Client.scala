@@ -35,7 +35,7 @@ case class ExpectedHug(
 
 class Client(config: TelepathClientConfig) extends Telepath {
 
-  lazy val socket = newSocket(SocketType.Dealer, Linger(0L))
+  lazy val socket = newSocket(SocketParams(SocketType.Dealer), Linger(0L))
   var activeRequests = Map.empty[Uuid, CompletableFuture[Any]]
   var expectedHugs = Map.empty[Uuid, ExpectedHug]
   private var activePing: Option[CompletableFuture[Any]] = None

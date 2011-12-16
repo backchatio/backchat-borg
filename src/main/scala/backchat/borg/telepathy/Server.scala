@@ -30,7 +30,7 @@ class Server(config: ServerConfig) extends Telepath {
 
   import Server._
 
-  lazy val socket = config.socket getOrElse newSocket(SocketType.Router, Linger(0L))
+  lazy val socket = config.socket getOrElse newSocket(SocketParams(SocketType.Router), Linger(0L))
   lazy val remoteSubscriptions = config.remoteSubscriptions getOrElse newRemoteSubscriptions
   lazy val localSubscriptions = config.localSubscriptions getOrElse newLocalSubscriptions
   var activeClients = Vector.empty[ClientSession]
